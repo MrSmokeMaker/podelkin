@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { AiGatewayError, workerTextJson } from "./aiClient";
-import { SOURCE_ANALYSIS_PROMPT, TAGS_PROMPT } from "./craftPrompt";
+import { FROM_SCRATCH_PROMPT, SOURCE_ANALYSIS_PROMPT, TAGS_PROMPT } from "./craftPrompt";
 
 const stepSchema = z.object({
   n: z.number().int().positive(),
@@ -43,6 +43,10 @@ export interface CraftDraftResult {
   provider?: string;
 }
 
+export type CraftGenerationInput =
+  | { kind: "source"; text: string }
+  | { kind: "topic"; prompt: string };
+
 export interface DraftCacheRow {
   payload: unknown;
 }
@@ -60,30 +64,32 @@ export function normalizeTopic(topic: string): string {
 }
 
 /**
- * Новый поток: текст страницы-источника → Mistral (long) → черновик мастер-класса.
+ * Два режима длинного вызова: анализ страницы-источника (kind: "source")
+ * или придумывание с нуля по текстовому запросу (kind: "topic").
  * Затем короткий вызов (Cloudflare Mistral) уточняет теги.
  * Один повтор длинного вызова, если модель вернула невалидный JSON.
  */
 export async function generateCraftDraft(
-  sourceText: string,
+  input: CraftGenerationInput,
   findCachedDraft?: (normalizedTopic: string) => CraftDraftRow | null | Promise<CraftDraftRow | null>
 ): Promise<CraftDraftResult> {
   const cacheEnabled = process.env.CACHE_LLM === "true";
 
   if (cacheEnabled && findCachedDraft) {
-    const cached = await findCachedDraft(normalizeTopic(sourceText.slice(0, 500)));
+    const cacheSource = input.kind === "topic" ? input.prompt : input.text;
+    const cached = await findCachedDraft(normalizeTopic(cacheSource.slice(0, 500)));
     if (cached) {
       return { valid: true, data: cached.payload as CraftDraftData, cached: true };
     }
   }
 
-  const first = await callSourceAnalysis(sourceText, false);
+  const first = await callDraftGeneration(input, false);
   if (first.valid) {
     return finalizeTags(first);
   }
 
   // Ровно один повтор с дополнительной инструкцией «только валидный JSON».
-  const second = await callSourceAnalysis(sourceText, true);
+  const second = await callDraftGeneration(input, true);
   if (second.valid) {
     return finalizeTags(second);
   }
@@ -91,18 +97,23 @@ export async function generateCraftDraft(
   return { valid: false, error: second.error ?? "Модель вернула некорректный JSON" };
 }
 
-async function callSourceAnalysis(
-  sourceText: string,
+async function callDraftGeneration(
+  input: CraftGenerationInput,
   retry: boolean
 ): Promise<CraftDraftResult> {
+  const system = input.kind === "topic" ? FROM_SCRATCH_PROMPT : SOURCE_ANALYSIS_PROMPT;
+  const base =
+    input.kind === "topic"
+      ? `Запрос пользователя: ${input.prompt}`
+      : `Текст страницы-источника:\n\n${input.text}`;
   const userPrompt = retry
-    ? `Текст страницы-источника:\n\n${sourceText}\n\nПредыдущий ответ не был валидным JSON. Верни валидный JSON — без markdown, без комментариев, только объект по схеме.`
-    : `Текст страницы-источника:\n\n${sourceText}`;
+    ? `${base}\n\nПредыдущий ответ не был валидным JSON. Верни валидный JSON — без markdown, без комментариев, только объект по схеме.`
+    : base;
 
   let result;
   try {
     result = await workerTextJson({
-      system: SOURCE_ANALYSIS_PROMPT,
+      system,
       prompt: userPrompt,
       mode: "long",
       maxTokens: 2800,

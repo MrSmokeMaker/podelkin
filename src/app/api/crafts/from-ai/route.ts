@@ -6,7 +6,11 @@ import {
   findCachedAiDraft,
   registerGeneration,
 } from "@/lib/db";
-import { generateCraftDraft, normalizeTopic } from "@/server/services/craftDraft";
+import {
+  generateCraftDraft,
+  normalizeTopic,
+  type CraftGenerationInput,
+} from "@/server/services/craftDraft";
 import { AiGatewayError } from "@/server/services/aiClient";
 import { fetchSourceText } from "@/server/services/sourceFetcher";
 
@@ -30,34 +34,59 @@ export async function POST(request: NextRequest) {
   }
 
   let url = "";
+  let promptText = "";
   try {
-    const body = (await request.json()) as { url?: unknown };
+    const body = (await request.json()) as { url?: unknown; prompt?: unknown };
     url = typeof body.url === "string" ? body.url.trim() : "";
+    promptText = typeof body.prompt === "string" ? body.prompt.trim() : "";
   } catch {
     url = "";
   }
-  const parsedUrl = parseSourceUrl(url);
-  if (!parsedUrl) {
-    return NextResponse.json(
-      { error: "Укажите ссылку на страницу с поделкой (https://…)" },
-      { status: 400 }
-    );
+
+  // Два режима: текстовый запрос — придумать с нуля, ссылка — разобрать источник.
+  let generationInput: CraftGenerationInput;
+  let topicKey: string;
+
+  if (promptText.length > 0) {
+    if (promptText.length < 3 || promptText.length > 500) {
+      return NextResponse.json(
+        { error: "Опишите поделку в 3–500 символах" },
+        { status: 400 }
+      );
+    }
+    generationInput = { kind: "topic", prompt: promptText };
+    topicKey = promptText;
+  } else {
+    const parsedUrl = parseSourceUrl(url);
+    if (!parsedUrl) {
+      return NextResponse.json(
+        {
+          error:
+            "Опишите поделку текстом или укажите ссылку на страницу с оригиналом (https://…)",
+        },
+        { status: 400 }
+      );
+    }
+
+    let sourceText: string;
+    try {
+      sourceText = await fetchSourceText(parsedUrl, MAX_SOURCE_TEXT);
+    } catch (error) {
+      const message =
+        error instanceof Error && error.name === "TimeoutError"
+          ? "Страница-источник не ответила за 15 секунд"
+          : "Не удалось скачать страницу-источник";
+      return NextResponse.json({ error: message }, { status: 422 });
+    }
+
+    generationInput = { kind: "source", text: sourceText };
+    topicKey = parsedUrl.href;
   }
 
-  let sourceText: string;
   try {
-    sourceText = await fetchSourceText(parsedUrl, MAX_SOURCE_TEXT);
-  } catch (error) {
-    const message =
-      error instanceof Error && error.name === "TimeoutError"
-        ? "Страница-источник не ответила за 15 секунд"
-        : "Не удалось скачать страницу-источник";
-    return NextResponse.json({ error: message }, { status: 422 });
-  }
-
-  try {
-    const result = await generateCraftDraft(sourceText, (normalizedTopic) =>
-      findCachedAiDraft(normalizedTopic, DAY_MS)
+    // Ключ кэша — стабильный (запрос или URL), а не первые строки страницы.
+    const result = await generateCraftDraft(generationInput, () =>
+      findCachedAiDraft(normalizeTopic(topicKey), DAY_MS)
     );
 
     if (!result.valid || !result.data) {
@@ -73,8 +102,8 @@ export async function POST(request: NextRequest) {
     }
 
     const draft = createAiDraft({
-      topic: parsedUrl.href,
-      normalizedTopic: normalizeTopic(parsedUrl.href),
+      topic: topicKey,
+      normalizedTopic: normalizeTopic(topicKey),
       payload: result.data,
       valid: true,
     });

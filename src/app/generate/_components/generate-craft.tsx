@@ -5,6 +5,7 @@ import {
   CheckCircle2,
   Clock,
   ImageOff,
+  Link2,
   ListChecks,
   Loader2,
   Sparkles,
@@ -168,6 +169,8 @@ export function GenerateCraft() {
   const { role } = useFeatureFlags();
   const toast = useToast();
   const [topic, setTopic] = useState("");
+  const [sourceUrl, setSourceUrl] = useState("");
+  const [pendingMode, setPendingMode] = useState<"topic" | "url" | null>(null);
   const [phase, setPhase] = useState<Phase>("form");
   const [draft, setDraft] = useState<DraftInfo | null>(null);
   const [result, setResult] = useState<ApproveResult | null>(null);
@@ -176,17 +179,22 @@ export function GenerateCraft() {
 
   const trimmed = topic.trim();
   const topicValid = trimmed.length >= 3 && trimmed.length <= 120;
+  const urlTrimmed = sourceUrl.trim();
+  const urlValid = /^https?:\/\/\S{4,}/i.test(urlTrimmed);
   const busy = phase === "generating" || phase === "approving";
 
-  async function generate() {
-    if (!topicValid || busy) return;
+  async function generate(mode: "topic" | "url") {
+    if (busy) return;
+    const byTopic = mode === "topic";
+    if (byTopic ? !topicValid : !urlValid) return;
     setPhase("generating");
+    setPendingMode(mode);
     setError(null);
     try {
       const res = await fetch(`/api/crafts/from-ai?role=${role}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topic: trimmed }),
+        body: JSON.stringify(byTopic ? { prompt: trimmed } : { url: urlTrimmed }),
       });
       const body = (await res.json().catch(() => null)) as {
         draftId?: string;
@@ -205,6 +213,7 @@ export function GenerateCraft() {
         });
         setRemainingQuota(Number(body.remainingQuota) || 0);
         setPhase("draft");
+        setPendingMode(null);
         if (body.cached) {
           toast(
             "Черновик из кэша",
@@ -225,9 +234,11 @@ export function GenerateCraft() {
         setError(body?.error ?? `Ошибка генерации (${res.status})`);
       }
       setPhase("form");
+      setPendingMode(null);
     } catch {
       setError("Сеть недоступна — проверьте соединение и попробуйте ещё раз");
       setPhase("form");
+      setPendingMode(null);
     }
   }
 
@@ -280,6 +291,7 @@ export function GenerateCraft() {
   function backToForm() {
     setDraft(null);
     setError(null);
+    setPendingMode(null);
     setPhase("form");
   }
 
@@ -287,6 +299,8 @@ export function GenerateCraft() {
     setDraft(null);
     setResult(null);
     setTopic("");
+    setSourceUrl("");
+    setPendingMode(null);
     setError(null);
     setPhase("form");
   }
@@ -304,21 +318,21 @@ export function GenerateCraft() {
 
       {(phase === "form" || phase === "generating") && (
         <section
-          aria-label="Тема генерации"
+          aria-label="Генерация поделки"
           className="rounded-2xl bg-white p-5 shadow-card ring-1 ring-ink/5 sm:p-6"
         >
           <label htmlFor="topic" className="text-sm font-bold">
-            Тема мастер-класса
+            Новая поделка с нуля
           </label>
           <p className="mt-1 text-xs text-ink-soft">
-            Например: «подсвечник из банки и джута» — от 3 до 120 символов
+            Опишите словами, что придумать: «подсвечник из банки и джута» — от 3 до 120 символов
           </p>
           <div className="mt-3 flex flex-col gap-3 sm:flex-row">
             <input
               id="topic"
               value={topic}
               onChange={(event) => setTopic(event.target.value)}
-              onKeyDown={(event) => event.key === "Enter" && generate()}
+              onKeyDown={(event) => event.key === "Enter" && generate("topic")}
               disabled={busy}
               maxLength={120}
               placeholder="О чём мастер-класс?"
@@ -326,21 +340,66 @@ export function GenerateCraft() {
             />
             <button
               type="button"
-              onClick={generate}
+              onClick={() => generate("topic")}
               disabled={busy || !topicValid}
               className={cn(PRIMARY_BTN, "sm:w-auto")}
             >
-              {phase === "generating" ? (
+              {pendingMode === "topic" ? (
                 <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
               ) : (
                 <Sparkles className="h-4 w-4" aria-hidden />
               )}
-              Сгенерировать
+              Сгенерировать с нуля
             </button>
           </div>
           {!topicValid && trimmed.length > 0 && (
             <p className="mt-2 text-xs font-medium text-[#9C5570]">
               Нужно от 3 до 120 символов
+            </p>
+          )}
+
+          <div className="my-5 flex items-center gap-3 text-xs font-semibold uppercase tracking-wide text-ink-soft">
+            <span className="h-px flex-1 bg-ink/10" aria-hidden />
+            или по готовому образцу
+            <span className="h-px flex-1 bg-ink/10" aria-hidden />
+          </div>
+
+          <label htmlFor="source-url" className="text-sm font-bold">
+            Повторить по ссылке-оригиналу
+          </label>
+          <p className="mt-1 text-xs text-ink-soft">
+            Ссылка на чужой мастер-класс (only-paper.ru, 1001zagotovka.ru) — ИИ изучит источник и составит свой вариант
+          </p>
+          <div className="mt-3 flex flex-col gap-3 sm:flex-row">
+            <input
+              id="source-url"
+              type="url"
+              inputMode="url"
+              value={sourceUrl}
+              onChange={(event) => setSourceUrl(event.target.value)}
+              onKeyDown={(event) => event.key === "Enter" && generate("url")}
+              disabled={busy}
+              maxLength={2000}
+              placeholder="https://only-paper.ru/…"
+              className="min-h-12 w-full rounded-xl bg-paper-deep/60 px-4 text-sm outline-none ring-1 ring-ink/10 transition focus:ring-2 focus:ring-clay disabled:opacity-60"
+            />
+            <button
+              type="button"
+              onClick={() => generate("url")}
+              disabled={busy || !urlValid}
+              className={cn(SECONDARY_BTN, "sm:w-auto")}
+            >
+              {pendingMode === "url" ? (
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+              ) : (
+                <Link2 className="h-4 w-4" aria-hidden />
+              )}
+              Из источника
+            </button>
+          </div>
+          {!urlValid && urlTrimmed.length > 0 && (
+            <p className="mt-2 text-xs font-medium text-[#9C5570]">
+              Вставьте полную ссылку, начинающуюся с http:// или https://
             </p>
           )}
 
@@ -385,8 +444,8 @@ export function GenerateCraft() {
               Думаю… <ElapsedSeconds />
             </p>
             <p className="mt-0.5 text-xs text-ink-soft">
-              Обычно 5–20 секунд. Если ответ не пройдёт валидацию, будет ровно
-              один автоматический повтор.
+              Обычно 10–40 секунд (по ссылке — дольше). Если ответ не пройдёт
+              валидацию, будет ровно один автоматический повтор.
             </p>
           </div>
         </section>
