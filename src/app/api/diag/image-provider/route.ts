@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
+import { workerImage } from "@/server/services/aiClient";
 
 export const dynamic = "force-dynamic";
 
-/* Диагностика Workers AI: минимальный запрос к flux-1-schnell
-   (1 шаг, короткий промпт) и честный статус наружу.
+/* Диагностика AI-шлюза: минимальный запрос к FLUX через наш воркер
+   (короткий промпт) и честный статус наружу.
    Никаких секретов в ответе — только коды и текст ошибки. */
 
 interface DiagResult {
@@ -13,61 +14,47 @@ interface DiagResult {
 }
 
 export async function GET(): Promise<NextResponse<DiagResult>> {
-  const accountId = process.env.CF_ACCOUNT_ID;
-  const apiToken = process.env.CF_API_TOKEN;
-
-  if (!accountId || !apiToken) {
+  if (!process.env.WORKER_URL) {
     return NextResponse.json({
       ok: false,
       status: null,
-      message: "CF_ACCOUNT_ID / CF_API_TOKEN не заданы в .env",
+      message: "WORKER_URL не задан в .env — AI-генерация недоступна",
     });
   }
 
   try {
-    const response = await fetch(
-      `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/@cf/black-forest-labs/flux-1-schnell`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${apiToken}`,
-        },
-        body: JSON.stringify({ prompt: "a small red apple", steps: 1 }),
-        signal: AbortSignal.timeout(15_000),
-      }
-    );
+    // 1 шаг FLUX не выбираем: воркер сам фиксирует параметры (1024×768, steps 4).
+    const image = await workerImage("a small red apple on a neutral background", 42);
 
-    if (response.ok) {
-      const payload = (await response.json()) as { result?: { image?: string } };
-      const hasImage = Boolean(payload.result?.image);
+    return NextResponse.json({
+      ok: image.length > 100,
+      status: 200,
+      message:
+        image.length > 100
+          ? "AI-шлюз отвечает, изображение получено"
+          : "Шлюз ответил, но изображение пустое",
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === "TimeoutError") {
       return NextResponse.json({
-        ok: hasImage,
-        status: response.status,
-        message: hasImage
-          ? "Cloudflare Workers AI отвечает, изображение получено"
-          : "HTTP 200, но изображения в ответе нет",
+        ok: false,
+        status: null,
+        message: "Таймаут запроса к AI-шлюзу (90 с)",
       });
     }
-
-    const text = (await response.text()).slice(0, 300);
+    const status = "status" in error && typeof error.status === "number" ? error.status : null;
+    const text = error instanceof Error ? error.message.slice(0, 300) : "неизвестная ошибка";
     const messages: Record<number, string> = {
-      401: "Токен отклонён (401) — проверьте CF_API_TOKEN",
-      403: "Доступ запрещён (403) — у токена нет прав Workers AI",
+      401: "Шлюз отклонил запрос (401) — воркер требует секрет, которого нет",
+      403: "Доступ запрещён (403) — проверьте права воркера на Workers AI",
       429: "Квота исчерпана (429) — лимит Workers AI на сегодня",
+      502: "Mistral/FLUX в воркере ответили ошибкой (502) — смотрите логи wrangler",
+      503: "Шлюз недоступен (503) — воркер не задеплоен или спит",
     };
     return NextResponse.json({
       ok: false,
-      status: response.status,
-      message:
-        messages[response.status] ??
-        `Cloudflare вернул ${response.status}: ${text}`,
+      status,
+      message: (status !== null && messages[status]) || `Шлюз вернул ошибку: ${text}`,
     });
-  } catch (error) {
-    const message =
-      error instanceof Error && error.name === "TimeoutError"
-        ? "Таймаут запроса к Cloudflare (15 с)"
-        : "Сеть недоступна — исходящие запросы из этой среды не проходят";
-    return NextResponse.json({ ok: false, status: null, message });
   }
 }
