@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
-import { CraftCover } from "@/components/craft-cover";
+import { CraftPhoto } from "@/components/craft-photo";
 import { crafts, difficultyTone } from "@/lib/crafts";
 
 export const metadata: Metadata = {
@@ -29,9 +29,8 @@ export default function BuildIndexPage() {
               className="group flex items-center gap-4 rounded-2xl bg-white p-3 shadow-card ring-1 ring-ink/5 transition hover:-translate-y-0.5 hover:shadow-soft"
             >
               <div className="w-24 shrink-0 overflow-hidden rounded-xl">
-                <CraftCover
-                  slug={craft.slug}
-                  category={craft.category}
+                <CraftPhoto
+                  craft={craft}
                   className="aspect-square w-full"
                   rounded=""
                 />

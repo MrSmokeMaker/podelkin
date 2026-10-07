@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Clock, Wallet } from "lucide-react";
-import { CraftCover } from "@/components/craft-cover";
+import { CraftPhoto } from "@/components/craft-photo";
 import {
   craftCost,
   craftMinutes,
@@ -17,7 +17,7 @@ export function CraftCard({ craft }: { craft: Craft }) {
       className="group flex flex-col overflow-hidden rounded-2xl bg-white shadow-card ring-1 ring-ink/5 transition-all duration-200 hover:-translate-y-1 hover:shadow-soft focus-visible:outline-2 focus-visible:outline-clay active:translate-y-0"
     >
       <div className="relative">
-        <CraftCover slug={craft.slug} category={craft.category} />
+        <CraftPhoto craft={craft} />
         <span className="absolute left-3 top-3 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold text-ink">
           {craft.category}
         </span>

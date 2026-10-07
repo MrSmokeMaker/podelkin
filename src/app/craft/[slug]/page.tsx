@@ -9,7 +9,7 @@ import {
   Wallet,
   Wrench,
 } from "lucide-react";
-import { CraftCover } from "@/components/craft-cover";
+import { CraftPhoto } from "@/components/craft-photo";
 import { SafetyBanner } from "@/components/safety-banner";
 import { ShoppingList } from "@/components/shopping-list";
 import { ProgressBar } from "@/components/progress";
@@ -61,7 +61,7 @@ export default async function CraftPage({
       </nav>
 
       <header className="overflow-hidden rounded-3xl bg-white shadow-card ring-1 ring-ink/5">
-        <CraftCover slug={craft.slug} category={craft.category} rounded="" />
+        <CraftPhoto craft={craft} rounded="" />
         <div className="space-y-3 p-5 sm:p-6">
           <div className="flex flex-wrap items-center gap-2">
             <span className="rounded-full bg-clay-soft px-3 py-1 text-xs font-semibold text-[#8A4A2C]">
