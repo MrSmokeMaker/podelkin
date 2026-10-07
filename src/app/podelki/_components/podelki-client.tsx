@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Clock, Loader2, Plus, Search } from "lucide-react";
+import { Clock, Plus, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { categoryIcon, DIFFICULTY_STYLES } from "./catalog-visuals";
 import { InstallBanner } from "./install-banner";
@@ -287,10 +287,28 @@ export function PodelkiClient() {
       )}
 
       {status === "loading" && (
-        <p className="flex items-center justify-center gap-2 rounded-2xl bg-white p-8 text-sm text-ink-soft shadow-card ring-1 ring-ink/5">
-          <Loader2 aria-hidden className="h-4 w-4 animate-spin" />
-          Загружаем каталог…
-        </p>
+        <div aria-busy="true">
+          <p className="sr-only">Загружаем каталог…</p>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {Array.from({ length: 8 }, (_, index) => (
+              <div
+                key={index}
+                aria-hidden
+                className="overflow-hidden rounded-xl bg-white shadow-card ring-1 ring-ink/5"
+              >
+                <div className="aspect-[4/3] animate-pulse bg-paper-deep" />
+                <div className="space-y-2 p-3">
+                  <div className="h-3 w-1/2 animate-pulse rounded-full bg-paper-deep" />
+                  <div className="h-4 w-4/5 animate-pulse rounded-full bg-paper-deep" />
+                  <div className="flex gap-2 pt-1">
+                    <div className="h-5 w-16 animate-pulse rounded-full bg-paper-deep" />
+                    <div className="h-5 w-20 animate-pulse rounded-full bg-paper-deep" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
 
       {status === "error" && (
