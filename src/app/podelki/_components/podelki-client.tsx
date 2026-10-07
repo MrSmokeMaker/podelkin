@@ -2,20 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import {
-  Cat,
-  Clock,
-  Flower2,
-  Loader2,
-  Mail,
-  Plane,
-  Plus,
-  Search,
-  TreePine,
-  Wind,
-  type LucideIcon,
-} from "lucide-react";
+import { Clock, Loader2, Plus, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { categoryIcon, DIFFICULTY_STYLES } from "./catalog-visuals";
 import type { CatalogItem } from "@/lib/catalog-db";
 
 /* Константы продублированы локально: catalog-db лежит на сервере
@@ -30,21 +19,6 @@ const CATEGORIES = [
 ] as const;
 const DIFFICULTIES = ["легко", "средне", "сложно"] as const;
 const SOURCES = ["Only Paper", "1001 Заготовка"] as const;
-
-const CATEGORY_ICONS: Record<string, LucideIcon> = {
-  "бумажная модель": Plane,
-  "деревянная заготовка": TreePine,
-  "3D-открытка": Mail,
-  игрушка: Cat,
-  макет: Wind,
-  декор: Flower2,
-};
-
-const DIFFICULTY_STYLES: Record<string, string> = {
-  легко: "bg-sage-soft",
-  средне: "bg-sand-soft",
-  сложно: "bg-clay-soft",
-};
 
 type SortKey = "new" | "title" | "time";
 
@@ -119,7 +93,7 @@ function ChipGroup({
 }
 
 function ItemCard({ item }: { item: CatalogItem }) {
-  const Icon = CATEGORY_ICONS[item.category] ?? Flower2;
+  const Icon = categoryIcon(item.category);
   return (
     <Link
       href={`/podelki/${item.id}`}
