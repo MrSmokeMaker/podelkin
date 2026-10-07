@@ -10,6 +10,7 @@ import {
   Layers,
   LayoutGrid,
   Scissors,
+  Shapes,
   Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -17,6 +18,7 @@ import { cn } from "@/lib/utils";
 const links = [
   { href: "/", label: "Главная", icon: House },
   { href: "/catalog", label: "Каталог", icon: LayoutGrid },
+  { href: "/podelki", label: "Поделки", icon: Shapes },
   { href: "/generate", label: "AI", icon: Sparkles },
   { href: "/inventory", label: "Запасы", icon: Boxes },
   { href: "/boards", label: "Доски", icon: Layers },
@@ -29,7 +31,7 @@ const mobileLinks = [
   { href: "/catalog", label: "Каталог", icon: LayoutGrid },
   { href: "/build", label: "Мастер", icon: Scissors },
   { href: "/inventory", label: "Запасы", icon: Boxes },
-  { href: "/stats", label: "Статистика", icon: ChartPie },
+  { href: "/podelki", label: "Поделки", icon: Shapes },
 ];
 
 export function SiteHeader() {
@@ -54,7 +56,7 @@ export function SiteHeader() {
                 key={href}
                 href={href}
                 className={cn(
-                  "rounded-xl px-4 py-2.5 text-sm font-medium transition-colors",
+                  "rounded-xl px-3 py-2.5 text-sm font-medium transition-colors lg:px-4",
                   active
                     ? "bg-clay-soft text-[#8A4A2C]"
                     : "text-ink-soft hover:bg-clay-soft/60 hover:text-ink"
