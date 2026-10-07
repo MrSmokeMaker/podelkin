@@ -48,7 +48,22 @@ export interface Board {
   craftSlugs: string[];
 }
 
-export const crafts: Craft[] = craftData;
+export const crafts: AiCraft[] = craftData.map((craft) => ({
+  ...craft,
+  source: "manual" as const,
+}));
+
+/* STEP 6 — поля Craft из миграции ai_generation. Prisma-эквивалент:
+   imagePrompt String?, imageSeed Int?, source String @default("manual"),
+   assetId String?, обратная связь ImageAsset ← Craft[] */
+export interface AiCraftFields {
+  imagePrompt?: string;
+  imageSeed?: number;
+  source: "manual" | "ai";
+  assetId?: string;
+}
+
+export type AiCraft = Craft & AiCraftFields;
 
 const PRICE_DATE = "2025-11-20";
 
@@ -230,4 +245,157 @@ export function deleteInventoryItem(id: string): boolean {
   if (index === -1) return false;
   inventory.splice(index, 1);
   return true;
+}
+
+/* ===== STEP 6: модели AI-генерации (эквивалент Prisma-миграции ai_generation) ===== */
+
+export interface ImageAsset {
+  id: string;
+  promptHash: string;
+  prompt: string;
+  provider: string;
+  fileUrl: string | null;
+  seed: number;
+  width: number;
+  height: number;
+  steps: number;
+  hits: number;
+  createdAt: string;
+}
+
+export interface AiDraft {
+  id: string;
+  topic: string;
+  normalizedTopic: string;
+  payload: unknown;
+  valid: boolean;
+  status: "draft" | "approved" | "rejected";
+  createdAt: string;
+  craftId: string | null;
+}
+
+export const imageAssets: ImageAsset[] = [];
+export const aiDrafts: AiDraft[] = [];
+
+export class P2002UniqueViolation extends Error {
+  code = "P2002";
+
+  constructor(target: string) {
+    super(`Unique constraint failed on ${target}`);
+    this.name = "P2002UniqueViolation";
+  }
+}
+
+let assetSeq = 0;
+
+export const imageAssetStore = {
+  async findByHash(promptHash: string): Promise<ImageAsset | null> {
+    return imageAssets.find((a) => a.promptHash === promptHash) ?? null;
+  },
+
+  async create(input: {
+    promptHash: string;
+    prompt: string;
+    provider: string;
+    seed: number;
+  }): Promise<ImageAsset> {
+    if (imageAssets.some((a) => a.promptHash === input.promptHash)) {
+      throw new P2002UniqueViolation("ImageAsset.promptHash");
+    }
+    const row: ImageAsset = {
+      id: `img-${String(++assetSeq).padStart(4, "0")}`,
+      width: 1024,
+      height: 1024,
+      steps: Number(process.env.CF_STEPS) || 4,
+      hits: 0,
+      createdAt: new Date().toISOString(),
+      fileUrl: null,
+      ...input,
+    };
+    imageAssets.push(row);
+    return row;
+  },
+
+  createUniqueViolation(): Error {
+    return new P2002UniqueViolation("ImageAsset.promptHash");
+  },
+
+  async incrementHits(id: string): Promise<void> {
+    const row = imageAssets.find((a) => a.id === id);
+    if (row) row.hits += 1;
+  },
+
+  async updateFileUrl(id: string, fileUrl: string): Promise<void> {
+    const row = imageAssets.find((a) => a.id === id);
+    if (row) row.fileUrl = fileUrl;
+  },
+};
+
+let draftSeq = 0;
+
+export function createAiDraft(input: {
+  topic: string;
+  normalizedTopic: string;
+  payload: unknown;
+  valid: boolean;
+}): AiDraft {
+  const draft: AiDraft = {
+    id: `aid-${Date.now().toString(36)}-${++draftSeq}`,
+    topic: input.topic,
+    normalizedTopic: input.normalizedTopic,
+    payload: input.payload,
+    valid: input.valid,
+    status: "draft",
+    createdAt: new Date().toISOString(),
+    craftId: null,
+  };
+  aiDrafts.unshift(draft);
+  return draft;
+}
+
+export function findAiDraft(id: string): AiDraft | undefined {
+  return aiDrafts.find((d) => d.id === id);
+}
+
+export function findCachedAiDraft(
+  normalizedTopic: string,
+  withinMs: number
+): AiDraft | null {
+  const threshold = Date.now() - withinMs;
+  return (
+    aiDrafts.find(
+      (d) =>
+        d.normalizedTopic === normalizedTopic &&
+        d.valid &&
+        Date.parse(d.createdAt) >= threshold
+    ) ?? null
+  );
+}
+
+export function markAiDraftApproved(id: string, craftId: string): void {
+  const draft = findAiDraft(id);
+  if (draft) {
+    draft.status = "approved";
+    draft.craftId = craftId;
+  }
+}
+
+/* Счётчики для /api/stats/ai: растут по событиям генерации. */
+export const aiStats = {
+  llmCalls: 0,
+  imageRenders: 0,
+  cacheHits: 0,
+  cacheMisses: 0,
+};
+
+/* Дневной лимит генераций на пользователя (GEN_PER_USER_PER_DAY). */
+const generationLog: { userId: string; day: string }[] = [];
+
+export function countGenerationsToday(userId: string): number {
+  const day = new Date().toISOString().slice(0, 10);
+  return generationLog.filter((g) => g.userId === userId && g.day === day).length;
+}
+
+export function registerGeneration(userId: string): void {
+  generationLog.push({ userId, day: new Date().toISOString().slice(0, 10) });
 }
