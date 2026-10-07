@@ -18,6 +18,34 @@ export default {
     },
     extend: {
       colors: {
+        paper: {
+          DEFAULT: "#F7F2EA",
+          deep: "#EFE6D8",
+        },
+        ink: {
+          DEFAULT: "#43372B",
+          soft: "#8A7A67",
+        },
+        clay: {
+          DEFAULT: "#C77B58",
+          soft: "#F2D9CC",
+        },
+        sage: {
+          DEFAULT: "#9CAF88",
+          soft: "#E4EBDC",
+        },
+        sand: {
+          DEFAULT: "#DDB771",
+          soft: "#F5E9D2",
+        },
+        blush: {
+          DEFAULT: "#C98DA4",
+          soft: "#F4DFE6",
+        },
+        mist: {
+          DEFAULT: "#8FAEC7",
+          soft: "#DDE8F0",
+        },
         background: "hsl(var(--background) / <alpha-value>)",
         foreground: "hsl(var(--foreground) / <alpha-value>)",
         card: {
@@ -77,6 +105,10 @@ export default {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+      },
+      boxShadow: {
+        soft: "0 12px 32px -14px rgb(67 55 43 / 0.22)",
+        card: "0 4px 16px -8px rgb(67 55 43 / 0.14)",
       },
       keyframes: {
         "accordion-down": {

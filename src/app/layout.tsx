@@ -1,13 +1,29 @@
-import { cn } from "@/lib/utils";
+import type { Metadata, Viewport } from "next";
 import { GeistMono } from "geist/font/mono";
 import { GeistSans } from "geist/font/sans";
-import type { Metadata } from "next";
-import { ThemeProvider } from "@/components/theme-provider";
+import { cn } from "@/lib/utils";
+import { ToastProvider } from "@/components/toast";
+import { BottomNav, SiteHeader } from "@/components/site-nav";
+import { PwaRegister } from "@/components/pwa-register";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Preview | Giga Studio",
-  description: "Next.js 16 template with TypeScript, shadcn/ui, and Tailwind CSS",
+  title: {
+    default: "Рукоделие — мастерская идей",
+    template: "%s — Рукоделие",
+  },
+  description:
+    "Пошаговые мастер-классы по рукоделию: керамика, дерево, пряжа, свечи и не только. Списки покупок, запасы и статистика мастерской.",
+  applicationName: "Рукоделие",
+  manifest: "/manifest.json",
+  icons: { icon: "/icon.svg" },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#F7F2EA",
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -16,22 +32,22 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ru" suppressHydrationWarning>
+    <html lang="ru">
       <body
         className={cn(
-          "min-h-screen bg-background font-sans antialiased",
+          "paper-texture min-h-dvh bg-paper font-sans text-ink antialiased",
           GeistSans.variable,
           GeistMono.variable
         )}
       >
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
-          {children}
-        </ThemeProvider>
+        <ToastProvider>
+          <SiteHeader />
+          <main className="mx-auto w-full max-w-5xl px-4 pb-28 pt-6 md:pb-16">
+            {children}
+          </main>
+          <BottomNav />
+          <PwaRegister />
+        </ToastProvider>
       </body>
     </html>
   );
