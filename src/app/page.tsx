@@ -9,11 +9,13 @@ export default function HomePage() {
 
   return (
     <div className="space-y-10">
-      <section className="rounded-3xl bg-clay-soft p-6 sm:p-10">
+      <section className="overflow-hidden rounded-3xl bg-clay-soft">
+        <div className="grid lg:grid-cols-[1.15fr_0.85fr]">
+        <div className="p-6 sm:p-10">
         <p className="text-sm font-semibold uppercase tracking-wider text-[#8A4A2C]">
           Мастерская идей
         </p>
-        <h1 className="mt-2 max-w-xl text-3xl font-bold leading-tight tracking-tight sm:text-4xl">
+        <h1 className="mt-2 max-w-xl text-3xl font-bold leading-tight tracking-tight text-balance sm:text-4xl">
           Сделай что-нибудь своими руками — по шагам и без суеты
         </h1>
         <p className="mt-3 max-w-lg text-ink-soft">
@@ -62,6 +64,15 @@ export default function HomePage() {
             </div>
           ))}
         </dl>
+        </div>
+        <div className="relative min-h-56 sm:min-h-72 lg:min-h-0">
+          <img
+            src="/hero-workshop.webp"
+            alt="Иллюстрация: стол рукодельца с бумажными моделями, пряжей и кистями"
+            className="absolute inset-0 h-full w-full object-cover"
+          />
+        </div>
+        </div>
       </section>
 
       <section>
