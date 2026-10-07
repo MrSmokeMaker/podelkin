@@ -1,0 +1,21 @@
+# Простой CI: линт + сборка. Деплой не настраивается.
+# Используем bun (в репозитории есть bun.lock); при его отсутствии
+# в форке замените на npm: npm ci && npm run lint && npm run build.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install --frozen-lockfile
+      - run: bun run lint
+      - run: bun run build

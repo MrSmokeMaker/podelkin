@@ -1,0 +1,55 @@
+name: Баг (bug report)
+description: Что-то работает не так — сообщите, пожалуйста
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Чем больше деталей, тем быстрее починим. Скриншот — в плюс.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: Что произошло?
+      description: Ожидаемое поведение и что случилось на самом деле
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Шаги воспроизведения
+      placeholder: |
+        1. Открыть «Запасы»
+        2. Добавить «Пряжа, 300 г»
+        3. …
+    validations:
+      required: true
+  - type: dropdown
+    id: where
+    attributes:
+      label: Где возникло
+      options:
+        - Телефон (PWA, установлено)
+        - Телефон (браузер)
+        - Десктоп-браузер
+        - API (curl / интеграция)
+    validations:
+      required: true
+  - type: dropdown
+    id: network
+    attributes:
+      label: Был ли интернет
+      options:
+        - Онлайн
+        - Офлайн (проверяем PWA)
+    validations:
+      required: true
+  - type: textarea
+    id: env
+    attributes:
+      label: Браузер / ОС
+      placeholder: "Например: Safari 18, iOS 18.2 / Chrome 131, Windows 11"
+  - type: textarea
+    id: logs
+    attributes:
+      label: Логи или текст ошибки
+      description: Текст из консоли DevTools, если есть

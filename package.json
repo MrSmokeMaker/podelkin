@@ -8,7 +8,8 @@
     "format": "bunx prettier --write . --ignore-unknown",
     "build": "next build",
     "dev": "next dev",
-    "lint": "next lint"
+    "lint": "next lint",
+    "release:check": "sh scripts/release-checklist.sh"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

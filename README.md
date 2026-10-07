@@ -1,23 +1,40 @@
 # Рукоделие — DIY crafts PWA
 
-Пошаговые мастер-классы по рукоделию с каталогом, запасами, списками покупок,
-режимом мастера, API и архитектурой монетизации (тарифы Free / Premium / Admin).
-Фронтенд и бэкенд — одно приложение Next.js (App Router), TypeScript, Tailwind.
+«Рукоделие» превращает хобби в систему: пошаговые мастер-классы с калькулятором
+стоимости и списками покупок помогают сэкономить деньги и время, а запасы, доски
+настроения и статистика мастерской показывают, на что уходит бюджет и как растёт
+мастерство — от первой свечи до серийных подарков своими руками.
+
+## Стек и почему он такой
+
+- **Next.js 16 (App Router) + React 19 + TypeScript** — фронтенд и API в одном
+  процессе: один деплой, общие типы между страницами и Route Handlers,
+  типобезопасность от сида до UI.
+- **Tailwind CSS** — консистентный пастельный дизайн на токенах темы
+  (`paper`, `ink`, `clay-soft`…): одинаковые отступы, радиусы и цвета во всех
+  компонентах без ручной CSS-работы.
+- **shadcn/ui + lucide-react** — доступные готовые компоненты и иконки вместо
+  самописных: меньше багов в a11y и мобильных жестах.
+- **Слой данных в памяти (`src/lib/db.ts`)** — fallback вместо PostgreSQL +
+  Prisma (в среде нет сети для установки пакетов): тот же контракт моделей
+  (Craft, PriceBookItem, InventoryItem, Project, Board, Synonym), замена на
+  Prisma — переписать один файл (см. «Миграция на PostgreSQL»).
+- **PWA (manifest + service worker)** — установка на телефон и офлайн-доступ
+  к посещённым страницам; для Premium — предкэш топ-50 поделок.
 
 ## Запуск
 
-```bash
-bun install
-cp .env.example .env.local   # необязательно: значения по умолчанию уже рабочие
-bun run dev                  # фронтенд + API на http://localhost:3000
-```
+Локально (нужен [bun](https://bun.sh); PostgreSQL не требуется — данные в памяти):
 
-Продакшен-сборка:
-
-```bash
-bun run build
-bun run start
-```
+1. `bun install` — установить зависимости.
+2. `cp .env.example .env.local` — создать env (необязательно: значения по
+   умолчанию уже рабочие).
+3. Миграции и сид не нужны: слой данных в памяти сидируется при старте
+   (15 поделок, 41 позиция прайс-бука, 40 запасов, 3 проекта, 5 досок,
+   6 синонимов).
+4. `bun run dev` — фронтенд + API на `http://localhost:3000`.
+5. Продакшен: `bun run build && bun run start`.
+6. Проверка перед релизом: `bun run release:check`.
 
 ## Переменные окружения
 
@@ -25,29 +42,25 @@ bun run start
 |---|---|---|
 | `PORT` | `3000` | Порт dev-сервера |
 | `LANG` | `ru` | Язык интерфейса и локаль поиска |
-| `MONETIZATION_MODE` | `local` | Режим тарифов: `local` \| `staging` \| `production`. В `staging` позже подключаются тестовые платежи провайдера |
-| `DEFAULT_ROLE` | `free` | Роль по умолчанию, когда в запросе нет `?role=` или `x-user-role` |
-| `ENABLE_OFFLINE_SYNC` | `false` | Офлайн-синхронизация Premium (предкэш топ-50 поделок и проектов). Пока `false`, запуск только ручным mock-сигналом (см. PWA) |
-| `DATABASE_URL` | — | Зарезервировано для PostgreSQL + Prisma; сейчас не используется |
+| `MONETIZATION_MODE` | `local` | Режим тарифов: `local` \| `staging` \| `production` |
+| `DEFAULT_ROLE` | `free` | Роль по умолчанию без `?role=` / `x-user-role` |
+| `ENABLE_OFFLINE_SYNC` | `false` | Офлайн-синхронизация Premium (предкэш топ-50) |
+| `DATABASE_URL` | — | Зарезервировано для PostgreSQL + Prisma |
 
-## Стек и отличия от исходного ТЗ
+## Отличия от исходного ТЗ
 
-Исходное ТЗ предполагало Node.js + Express + PostgreSQL + Prisma. Среда
-выполнения не имеет доступа к сети, поэтому новые пакеты установить нельзя,
-а превью рендерит только Next.js. По оговорке ТЗ о fallback использованы
-эквиваленты с тем же контрактом API:
+ТЗ предполагало React + Vite + Express + Prisma + PostgreSQL. Среда без сети не
+позволяет ставить новые пакеты, а превью рендерит только Next.js, поэтому
+использованы эквиваленты с тем же контрактом API:
 
 | По ТЗ | Реализовано здесь |
 |---|---|
-| Express-сервер | Route Handlers Next.js (`src/app/api/**/route.ts`) в том же процессе |
-| PostgreSQL + Prisma | Слой данных в памяти `src/lib/db.ts` с моделями Craft, PriceBookItem, InventoryItem, Project, Board, Synonym |
-| Миграции + seed | Сид выполняется при старте модуля: 15 поделок, 41 позиция прайс-бука, 40 позиций запасов, 3 проекта, 5 досок, 6 синонимов |
-| tsvector + trigram | Нормализация (ё→е, нижний регистр, чистка пунктуации) + расширение синонимов + ранжирование по полям (`src/lib/search.ts`) |
-| zod | Ручная валидация тела запросов с понятными сообщениями об ошибках |
-| `server/middleware/auth.middleware.ts` | `src/lib/auth.ts` — тот же мок-слой аутентификации |
-| `server/utils/featureFlags.ts` | `src/lib/feature-flags.ts` — тот же движок фича-флагов |
-| `server/routes/*.ts` | Route Handlers: `/api/stats`, `/api/export/*`, `/api/boards` |
-| `frontend/hooks`, `frontend/pages` | `src/hooks/use-feature-flags.ts`, App Router-страницы `/stats`, `/export`, `/boards` |
+| Vite + React | Next.js App Router + React 19 (тот же стек-уровень, плюс SSR/SSG) |
+| Express-сервер | Route Handlers `src/app/api/**/route.ts` в том же процессе |
+| PostgreSQL + Prisma | In-memory слой `src/lib/db.ts` (миграция — см. ниже) |
+| `server/middleware/auth.middleware.ts` | `src/lib/auth.ts` |
+| `server/utils/featureFlags.ts` | `src/lib/feature-flags.ts` |
+| zod-валидация | Ручная валидация тел запросов с понятными ошибками |
 
 ## API
 
@@ -55,128 +68,46 @@ bun run start
 |---|---|---|---|
 | GET | `/api/health` | все | Проверка живости |
 | GET | `/api/crafts?q&category&difficulty&maxTimeMin&sort` | все | Поиск с фасетами |
-| GET | `/api/inventory` | все | Список запасов |
-| POST | `/api/inventory` | все | Добавить/обновить позицию (upsert по названию) |
-| DELETE | `/api/inventory/:id` | все | Удалить позицию |
-| GET | `/api/available` | все | Обратный поиск: что можно делать прямо сейчас |
-| GET · POST | `/api/projects` | все | Список / создание проекта |
-| GET | `/api/projects/:id` | все | Проект по id |
+| GET · POST · DELETE | `/api/inventory[/:id]` | все | Запасы (upsert по названию) |
+| GET | `/api/available` | все | Что можно сделать прямо сейчас |
+| GET · POST | `/api/projects` | все | Проекты |
 | PUT | `/api/projects/:id/step` | все | Отметить шаг, записать время |
-| GET | `/api/stats?role=free\|premium` | все | Free — базовые поля; premium — плюс разбивки, экономия, тренды |
-| GET | `/api/export/summary.txt` | все | Базовая текстовая сводка |
-| GET | `/api/export/detailed.csv` | premium | CSV: время по шагам, стоимость материалов, отклонение от плана |
+| GET | `/api/stats?role=free\|premium` | все | Free — базовые поля; premium — разбивки, экономия, тренды |
+| GET | `/api/export/summary.txt` | все | Текстовая сводка |
+| GET | `/api/export/detailed.csv` | premium | CSV: время по шагам, стоимость, отклонение |
 | GET · POST | `/api/boards` | все | Доски; POST проверяет лимит тарифа |
 
-Роль в мок-аутентификации передаётся через `?role=` или заголовок `x-user-role`
+Роль в мок-аутентификации — `?role=` или заголовок `x-user-role`
 (`free` | `premium` | `admin`); без них действует `DEFAULT_ROLE`.
-
-Примеры:
 
 ```bash
 curl -s "localhost:3000/api/crafts?q=свеча"           # синоним «свечка» тоже найдёт
-curl -s "localhost:3000/api/crafts?category=Дерево&sort=time"
-curl -s "localhost:3000/api/available" | head -c 600
-curl -s -X POST localhost:3000/api/projects \
-  -H "content-type: application/json" \
-  -d '{"craftSlug":"amigurumi-kotenok"}'
-curl -s -X PUT localhost:3000/api/projects/prj-03/step \
-  -H "content-type: application/json" \
-  -d '{"stepIndex":3,"minutesSpent":35}'
-curl -s "localhost:3000/api/stats"                    # free: только базовые поля
-curl -s "localhost:3000/api/stats?role=premium"       # + разбивки и тренды
-curl -s "localhost:3000/api/export/summary.txt" -o summary.txt
+curl -s "localhost:3000/api/stats?role=premium"       # расширенная аналитика
 curl -s "localhost:3000/api/export/detailed.csv?role=premium" -o detailed.csv
 curl -s -X POST "localhost:3000/api/boards?role=free" \
-  -H "content-type: application/json" \
-  -d '{"title":"Подарки"}'                            # 403 после 3 досок
+  -H "content-type: application/json" -d '{"title":"Подарки"}'   # 403 после 3 досок
 ```
-
-Поиск возвращает фасеты по категориям и сложности, посчитанные по текстовому
-совпадению (до фильтров). Каждый результат несёт `baseCost` и
-`missingPrices` — материалы без цены видны явно.
-
-## Калькулятор стоимости
-
-`src/lib/cost-calculator.ts` — чистая функция: материалы поделки × прайс-бук.
-Конвертация единиц через таблицу соответствий (г→кг, мл→л, см→м; штучные
-единицы без конверсии). `computeBaseCost` бросает `CostError` с понятным
-текстом, если цены нет или единицы несовместимы; `collectCost` собирает всё,
-что удалось посчитать, и перечисляет материалы без цены. Каждый источник
-цены содержит дату актуализации прайса.
-
-## Монетизация
-
-### Тарифы
-
-| Возможность | Free | Premium | Admin |
-|---|---|---|---|
-| Поиск, каталог, режим мастера | ✓ | ✓ | ✓ |
-| Базовая статистика (`totalCrafts`, `avgTime`, `avgCost`, `mostUsedMaterial`) | ✓ | ✓ | ✓ |
-| Сохранение 1 проекта / неограниченно | 1 | ∞ | ∞ |
-| Экспорт сводки `.txt` | ✓ | ✓ | ✓ |
-| Расширенная аналитика (стоимость по категориям, время по сложности, экономия, тренды материалов) | — | ✓ | ✓ |
-| Экспорт `.csv` (пошаговое время, стоимость, отклонение от плана) | — | ✓ | ✓ |
-| Офлайн-синхронизация (предкэш топ-50 поделок и проектов) | — | ✓ | ✓ |
-| Доски | до 3 | до 20 | до 20 |
-| Приоритетная поддержка (плейсхолдер) | — | ✓ | ✓ |
-| Управление сидом | — | — | ✓ |
-
-Пример цен (плейсхолдеры): Free — 0 ₽; Premium — 199 ₽/мес или 1 490 ₽/год
-(скидка ~38%); годовая подписка показывает баннер экономии. A/B-тесты цены
-и paywall'а проводятся по `MONETIZATION_MODE=staging`: события
-`upgrade_click` (клик по заблокированному элементу) и `plan_view`
-(просмотр страницы «Экспорт»/«Доски») отправляются в аналитику, когда
-подключён реальный провайдер.
-
-### Как работает гейтинг
-
-- **Сервер.** `src/lib/feature-flags.ts` — карта «роль → фичи», `resolveFeatures(role)`
-  возвращает `{ allowed, blocked }`. `src/lib/auth.ts` — мок-аутентификация:
-  `getAuthUser(request)` определяет роль и возвращает пользователя
-  `{ id, role, features, boardLimit }`. Эндпоинты проверяют
-  `features.allowed.includes(...)` и отдают 403 с понятным сообщением.
-- **Клиент.** `useFeatureFlags()` (`src/hooks/use-feature-flags.ts`) читает ту же
-  статическую карту; демо-роль берётся из `localStorage["rukodelie-role"]`,
-  по умолчанию `free`. Элементы закрывают через `has("feature")`:
-  не прячем, а показываем с `PremiumBadge` (`src/components/premium-badge.tsx`)
-  и `disabled`-состоянием. Бейдж — золотисто-розовый градиент с иконкой короны
-  и всплывающей подсказкой.
-- **Проверить Premium в превью:** в консоли браузера выполнить
-  `localStorage.setItem("rukodelie-role", "premium"); location.reload()`
-  (вернуть: `localStorage.removeItem("rukodelie-role")`).
-
-### Где что лежит
-
-| Файл | Роль |
-|---|---|
-| `src/lib/feature-flags.ts` | Карта тарифов, лимиты досок, `resolveFeatures` |
-| `src/lib/auth.ts` | Мок-аутентификация → объект пользователя |
-| `src/app/api/stats/route.ts` | Базовые поля всем, расширенные — premium |
-| `src/app/api/export/summary.txt/route.ts` | `.txt` для всех |
-| `src/app/api/export/detailed.csv/route.ts` | `.csv` только premium |
-| `src/app/api/boards/route.ts` | Лимиты досок 3/20, понятные ошибки 403 |
-| `src/hooks/use-feature-flags.ts` | Клиентские флаги (`has`, `boardLimit`, `role`) |
-| `src/components/premium-badge.tsx` | Бейдж с подсказкой |
-| `src/app/stats/_components/stats-advanced.tsx` | Расширенная секция: premium-данные или locked-карточки |
-| `src/app/export/_components/export-client.tsx` | Кнопки `.txt` / `.csv` с гейтингом |
-| `src/app/boards/_components/boards-client.tsx` | Визуальный лимит 3 досок + locked-карточки |
 
 ## PWA
 
-Service worker (`public/sw.js`) кэширует app shell и статику; обрабатываются
-только GET-запросы. POST/PUT/DELETE идут напрямую в сеть — кэш не мешает
-мутациям.
+**Установка на телефон:** открыть сайт в мобильном браузере → «Добавить на
+главный экран» (iOS Safari: Поделиться → На экран «Домой»; Android Chrome:
+меню → «Установить приложение»). После установки приложение открывается без
+адресной строки.
 
-**Тест офлайна:** DevTools → Application → Service Workers → Offline
-(или остановить `bun run dev`): навигация по посещённым страницам работает
-из кэша, мутации честно падают с сообщением об ошибке сети.
+**Офлайн-поведение:** service worker (`public/sw.js`) кэширует app shell
+(главная, каталог, запасы, доски, экспорт, статистика) и статику; посещённые
+страницы работают из кэша. Обрабатываются только GET-запросы — POST/PUT/DELETE
+идут напрямую в сеть, кэш не мешает мутациям; офлайн мутация честно падает
+с сообщением о сети.
 
-**Стратегии кэша по тарифам:**
+**Стратегия кэша:**
 
-- **Free** — только app shell и статика (кэш `rukodelie-v2`, core-страницы
-  при установке + cache-first с фоновым обновлением для всех GET).
-- **Premium** — дополнительно предкэш топ-50 поделок (`/api/crafts`,
-  страницы `/craft/<slug>`) и недавних проектов (`/api/projects`).
+- **Shell (все тарифы)** — core-страницы предкэшируются при установке
+  (cache `rukodelie-v2`), далее cache-first с фоновым обновлением.
+- **Premium pre-cache** — по сигналу `RUKODELIE_SYNC { premium: true }`
+  дозагружаются топ-50 поделок (`/api/crafts`, страницы `/craft/<slug>`) и
+  проекты (`/api/projects`). Free-клиент на такой сигнал ничего не кэширует.
   Пока `ENABLE_OFFLINE_SYNC=false`, сигнал отправляется вручную:
 
 ```js
@@ -186,67 +117,76 @@ navigator.serviceWorker.controller.postMessage({
 });
 ```
 
-Free-клиент, отправивший такой сигнал, получит ответ
-`{ type: "RUKODELIE_SYNC_RESULT", premium: false }` и ничего не предкэширует.
-Когда появится реальная сессия, сигнал будет отправляться автоматически
-из клиентского кода при `has("offlineSync")`.
+**Тест офлайна:** DevTools → Application → Service Workers → Offline.
 
-## Расширяемость
+## Монетизация
 
-- **Реальная авторизация (JWT/OAuth).** Единственная точка — `getAuthUser`
-  в `src/lib/auth.ts`: заменить чтение `?role=` на проверку подписи токена
-  и загрузку пользователя из БД; вернуть тот же `{ id, role, features,
-  boardLimit }`. Все эндпоинты и фронтенд продолжат работать без правок.
-- **Платёжный провайдер.** Добавить Route Handlers `src/app/api/billing/*`
-  (создание сессии оплаты, вебхук). Вебхук по `MONETIZATION_MODE`:
-  `staging` — тестовые платежи, `production` — боевые. Успешная оплата
-  меняет `role` пользователя в БД; фича-флаги пересчитываются из карты,
-  UI подхватит роль автоматически.
-- **Расширение stats API.** Новые premium-поля добавляются в ветку
-  `advancedStats` в `src/app/api/stats/route.ts`; тип `PremiumStats`
-  в `stats-advanced.tsx` дополняется теми же полями.
-- **Новая фича.** Добавить значение в `Feature` и в `ROLE_FEATURES`
-  (`src/lib/feature-flags.ts`) → проверить на сервере через
-  `getAuthUser(request).features.allowed` → закрыть в UI через
-  `has("feature")` + `PremiumBadge` + `disabled`-состояние.
+### Тарифы (пример цен — плейсхолдеры)
+
+| | Basic (Free) | Premium | Family |
+|---|---|---|---|
+| Цена | 0 ₽ | 199 ₽/мес · 1 490 ₽/год (−38%) | 349 ₽/мес |
+| Поиск, каталог, режим мастера | ✓ | ✓ | ✓ |
+| Базовая статистика и экспорт `.txt` | ✓ | ✓ | ✓ |
+| Проекты | 1 | ∞ | ∞ |
+| Доски | до 3 | до 20 | до 20 на участника + общие |
+| Расширенная аналитика, экспорт `.csv` | — | ✓ | ✓ |
+| Офлайн-синхронизация (топ-50) | — | ✓ | ✓ |
+| Приоритетная поддержка (плейсхолдер) | — | ✓ | ✓ |
+| Управление сидом (admin) | — | — | — |
+
+### Подключение платежей
+
+Точка интеграции — Route Handlers `src/app/api/billing/*`: создание сессии
+оплаты и вебхук. **Stripe**: `checkout.sessions.create` → вебхук
+`checkout.session.completed` меняет `role` пользователя в БД. **YooKassa**:
+создание платежа через API магазина → вебхук `payment.succeeded`. Вебхук
+должен проверять подпись и по `MONETIZATION_MODE` выбирать тестовый/боевой
+контур (`staging`/`production`). После смены роли фича-флаги пересчитываются
+из карты `src/lib/feature-flags.ts` — UI подхватывает тариф автоматически.
+
+### Как работает гейтинг
+
+- **Сервер.** `resolveFeatures(role)` возвращает `{ allowed, blocked }`;
+  `getAuthUser(request)` (`src/lib/auth.ts`) определяет роль и возвращает
+  `{ id, role, features, boardLimit }`. Эндпоинты проверяют
+  `features.allowed.includes(...)` и отдают 403 с понятным сообщением.
+- **Клиент.** `useFeatureFlags()` читает ту же статическую карту; демо-роль —
+  `localStorage["rukodelie-role"]` (по умолчанию `free`). Закрытые возможности
+  не прячем: показываем с `PremiumBadge` и `disabled`-состоянием.
+  Проверить Premium в превью: `localStorage.setItem("rukodelie-role",
+  "premium"); location.reload()`.
+
+A/B-тесты цены и paywall'а (события `upgrade_click`, `plan_view`) — в
+`docs/monetization-plan.md`.
 
 ## Contributing
 
-Структура:
+- **Новая поделка** — добавить запись в `src/data/mockData.ts` (материалы с
+  ценами должны быть в прайс-буке, иначе `baseCost` честно покажет
+  `missingPrices`).
+- **Расширение stats API** — premium-поля в ветку `advancedStats`
+  (`src/app/api/stats/route.ts`), тип `PremiumStats` в
+  `stats-advanced.tsx` дополнить теми же полями.
+- **Новая premium-фича** — значение в `Feature` и `ROLE_FEATURES`
+  (`src/lib/feature-flags.ts`) → серверная проверка через `getAuthUser` →
+  в UI `has("feature")` + `PremiumBadge` + `disabled` (не прятать —
+  пользователь должен видеть, что продаётся).
+- Подробнее — `CONTRIBUTING.md` (процесс PR, код-стайл, чек-лист).
 
-```
-src/
-  app/                  # страницы и API (App Router)
-    api/                # Route Handlers: crafts, inventory, projects, stats, export, boards
-    catalog/ stats/ export/ boards/ inventory/ build/   # страницы
-    [route]/_components # компоненты конкретной страницы
-  components/           # общие UI (craft-card, premium-badge, toast, site-nav…)
-  hooks/                # use-feature-flags и др.
-  lib/                  # feature-flags, auth, db, search, cost-calculator, crafts
-  data/mockData.ts      # сид-данные
-public/sw.js            # service worker
-```
+## License
 
-Правила, чтобы не сломать Free-тариф:
-
-1. Новые возможности по умолчанию попадают в `free`; premium-фичи — только
-   через фича-флаг, `PremiumBadge` и `disabled`-состояние (не прятать
-   полностью — пользователь должен видеть, что продаётся).
-2. Все серверные проверки дублируются: UI-гейтинг — это UX, а не защита;
-   доступ решает `getAuthUser` на сервере.
-3. Тексты интерфейса и ошибок — на русском, тон дружелюбный.
-4. Цвета — пастельные токены темы (`clay-soft`, `sand-soft`, `sage-soft`,
-   `mist-soft`, `blush-soft`), layout mobile-first, цели касания от 48px.
-5. Мутации через API не кэшируются service worker'ом (только GET).
+MIT — см. текст лицензии в выпуске. Все данные в репозитории (поделки,
+прайс-бук, запасы) — демонстрационные образцы, не для коммерческого
+использования как фактические расценки.
 
 ## Ограничения и миграция на PostgreSQL
 
-- Слой данных живёт в памяти процесса: мутации сбрасываются при перезапуске
-  сервера. Каталог, прайс-бук, запасы, доски и три демо-проекта пересоздаются
-  из сида.
-- Для переноса на PostgreSQL достаточно заменить функции `src/lib/db.ts` на
-  Prisma-запросы (схема моделей совпадает), поднять базу
+- Слой данных живёт в памяти: мутации сбрасываются при перезапуске, сид
+  пересоздаётся при старте модуля.
+- Для переноса: заменить функции `src/lib/db.ts` на Prisma-запросы (схема
+  моделей совпадает), поднять базу
   (`docker run -e POSTGRES_PASSWORD=rukodelie -p 5432:5432 postgres:16`),
-  задать `DATABASE_URL`, выполнить `npx prisma migrate dev` и
-  `npx prisma db seed`. Поисковый конвейер заменяется на
-  `ts_rank` + `similarity()` — контракт `/api/crafts` сохранится.
+  задать `DATABASE_URL`, выполнить `npx prisma migrate dev && npx prisma db
+  seed`. Поисковый конвейер заменяется на `ts_rank` + `similarity()` —
+  контракт `/api/crafts` сохранится.

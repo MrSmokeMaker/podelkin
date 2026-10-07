@@ -1,0 +1,48 @@
+name: Идея (feature request)
+description: Предложить новую поделку, фичу или улучшение
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Спасибо за идею! Опишите её подробно — так мы быстрее поймём пользу.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Какую проблему решает?
+      description: Например, «не могу понять, хватит ли запасов пряжи на плед»
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Предлагаемое решение
+      description: Что должно появиться и как это выглядит для пользователя
+    validations:
+      required: true
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Куда относится
+      options:
+        - Каталог / новые поделки
+        - Режим мастера
+        - Запасы / списки покупок
+        - Статистика / экспорт
+        - Доски
+        - Тарифы / монетизация
+        - Другое
+    validations:
+      required: true
+  - type: checkboxes
+    id: tier
+    attributes:
+      label: Тариф
+      description: Должна ли возможность быть платной?
+      options:
+        - label: Достаточно free-тарифа
+        - label: Подходит для Premium
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Альтернативы, которые вы рассматривали

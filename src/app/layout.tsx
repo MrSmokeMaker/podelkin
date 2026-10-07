@@ -17,6 +17,14 @@ export const metadata: Metadata = {
   applicationName: "Рукоделие",
   manifest: "/manifest.json",
   icons: { icon: "/icon.svg" },
+  openGraph: {
+    title: "Рукоделие — мастерская идей",
+    description:
+      "Пошаговые мастер-классы по рукоделию: керамика, дерево, пряжа, свечи и не только. Списки покупок, запасы и статистика мастерской.",
+    type: "website",
+    locale: "ru_RU",
+    siteName: "Рукоделие",
+  },
 };
 
 export const viewport: Viewport = {
