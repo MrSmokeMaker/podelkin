@@ -34,14 +34,17 @@ interface CloudflareResponse {
 const registry: Record<string, ImageProvider> = {
   cloudflare: renderCloudflare,
   pollinations: renderPollinations,
+  worker: renderViaWorker,
 };
 
 /* Правило из спеки: pollinations разрешён только вне production.
-   В production водяной провайдер не используется, даже если env просит его. */
+   В production водяной провайдер не используется, даже если env просит его.
+   Свой воркер (Mistral + FLUX) активен только когда задан WORKER_URL. */
 export function resolveProviderName(): string {
   const requested = process.env.IMAGE_PROVIDER;
   const isProduction = process.env.NODE_ENV === "production";
   if (requested === "pollinations" && !isProduction) return "pollinations";
+  if (requested === "worker" && process.env.WORKER_URL) return "worker";
   return "cloudflare";
 }
 
@@ -113,6 +116,44 @@ async function writeAssetFile(base64: string, assetId?: string): Promise<string>
   const filename = `${assetId ?? `craft-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`}.jpg`;
   await fs.writeFile(path.join(dir, filename), Buffer.from(base64, "base64"));
   return `/img/${filename}`;
+}
+
+/* Провайдер «worker»: наш Cloudflare Worker — Mistral развивает промт,
+   FLUX внутри воркера рисует картинку и возвращает base64.
+   Файл кладём к себе в uploads, чтобы кэш и /img работали одинаково. */
+async function renderViaWorker(
+  prompt: string,
+  _seed: number,
+  assetId?: string
+): Promise<ImageRenderResult> {
+  const workerUrl = process.env.WORKER_URL;
+  if (!workerUrl) {
+    throw new Error("WORKER_URL не задан — провайдер worker недоступен");
+  }
+
+  const response = await fetch(workerUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ prompt }),
+    signal: AbortSignal.timeout(90_000),
+  });
+
+  if (response.status === 429) {
+    throw new ImageRateLimitError(3600);
+  }
+
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`Worker ${response.status}: ${body.slice(0, 300)}`);
+  }
+
+  const payload = (await response.json()) as { image?: string };
+  if (!payload.image) {
+    throw new Error("Воркер не вернул изображение");
+  }
+
+  const url = await writeAssetFile(payload.image, assetId);
+  return { url, provider: "worker" };
 }
 
 function renderPollinations(prompt: string, seed: number): Promise<ImageRenderResult> {
