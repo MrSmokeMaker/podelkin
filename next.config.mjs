@@ -20,13 +20,6 @@ const nextConfig = {
             // Allow any site to embed this page in an <iframe>
             value: "frame-ancestors *;",
           },
-          {
-            // Разовая разблокировка превью: браузер хранит старый HTML с
-            // мёртвыми ссылками на стили. Этот заголовок заставляет его
-            // стереть HTTP-кэш, Cache Storage и снять service worker.
-            key: "Clear-Site-Data",
-            value: '"cache", "storage"',
-          },
           // NOTE: X-Frame-Options is legacy and does not support a wildcard;
           // if your platform injects X-Frame-Options: SAMEORIGIN you may need
           // to remove/override it via platform settings.
