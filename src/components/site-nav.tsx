@@ -10,12 +10,14 @@ import {
   Layers,
   LayoutGrid,
   Scissors,
+  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const links = [
   { href: "/", label: "Главная", icon: House },
   { href: "/catalog", label: "Каталог", icon: LayoutGrid },
+  { href: "/generate", label: "AI", icon: Sparkles },
   { href: "/inventory", label: "Запасы", icon: Boxes },
   { href: "/boards", label: "Доски", icon: Layers },
   { href: "/export", label: "Экспорт", icon: Download },

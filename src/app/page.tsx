@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Boxes, ChartPie, Hammer } from "lucide-react";
+import { ArrowRight, Boxes, ChartPie, Hammer, Sparkles } from "lucide-react";
 import { CraftCard } from "@/components/craft-card";
 import { crafts, formatRub, craftCost } from "@/lib/crafts";
 
@@ -27,6 +27,13 @@ export default function HomePage() {
           >
             <Hammer className="h-4 w-4" />
             Открыть каталог
+          </Link>
+          <Link
+            href="/generate"
+            className="flex min-h-12 items-center gap-2 rounded-xl bg-white px-6 py-3 text-sm font-semibold text-ink shadow-card ring-1 ring-ink/10 transition hover:bg-paper-deep active:scale-[0.98]"
+          >
+            <Sparkles className="h-4 w-4 text-clay" />
+            Сгенерировать с AI
           </Link>
           <Link
             href="/stats"
