@@ -111,6 +111,10 @@ export default {
         card: "0 4px 16px -8px rgb(67 55 43 / 0.14)",
       },
       keyframes: {
+        "toast-in": {
+          from: { opacity: "0", transform: "translateY(12px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
+        },
         "accordion-down": {
           from: { height: "0" },
           to: { height: "var(--radix-accordion-content-height)" },
@@ -123,6 +127,7 @@ export default {
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "toast-in": "toast-in 0.25s ease-out",
       },
     },
   },
