@@ -7,17 +7,21 @@ import {
   registerGeneration,
 } from "@/lib/db";
 import { generateCraftDraft, normalizeTopic } from "@/server/services/craftDraft";
-import { RateLimitError } from "@/server/services/groqClient";
+import { AiGatewayError } from "@/server/services/aiClient";
+import { fetchSourceText } from "@/server/services/sourceFetcher";
 
 export const dynamic = "force-dynamic";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+// Лимит текста источника: длинный контекст Mistral вмещает статью целиком,
+// но читать гигабайтные страницы наружу не нужно.
+const MAX_SOURCE_TEXT = 120_000;
 
 export async function POST(request: NextRequest) {
   const user = getAuthUser(request);
   const perDay = Number(process.env.GEN_PER_USER_PER_DAY) || 5;
 
-  // Лимит проверяем ДО обращения к Groq — платные вызовы не тратятся впустую.
+  // Лимит проверяем ДО обращения к ИИ — платные вызовы не тратятся впустую.
   if (countGenerationsToday(user.id) >= perDay) {
     return NextResponse.json(
       { error: "Лимит генераций на сегодня исчерпан" },
@@ -25,22 +29,34 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  let topic = "";
+  let url = "";
   try {
-    const body = (await request.json()) as { topic?: unknown };
-    topic = typeof body.topic === "string" ? body.topic.trim() : "";
+    const body = (await request.json()) as { url?: unknown };
+    url = typeof body.url === "string" ? body.url.trim() : "";
   } catch {
-    topic = "";
+    url = "";
   }
-  if (topic.length < 3 || topic.length > 120) {
+  const parsedUrl = parseSourceUrl(url);
+  if (!parsedUrl) {
     return NextResponse.json(
-      { error: "Укажите тему генерации — от 3 до 120 символов" },
+      { error: "Укажите ссылку на страницу с поделкой (https://…)" },
       { status: 400 }
     );
   }
 
+  let sourceText: string;
   try {
-    const result = await generateCraftDraft(topic, (normalizedTopic) =>
+    sourceText = await fetchSourceText(parsedUrl, MAX_SOURCE_TEXT);
+  } catch (error) {
+    const message =
+      error instanceof Error && error.name === "TimeoutError"
+        ? "Страница-источник не ответила за 15 секунд"
+        : "Не удалось скачать страницу-источник";
+    return NextResponse.json({ error: message }, { status: 422 });
+  }
+
+  try {
+    const result = await generateCraftDraft(sourceText, (normalizedTopic) =>
       findCachedAiDraft(normalizedTopic, DAY_MS)
     );
 
@@ -51,14 +67,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Попадание в кэш Groq не тратит — квота списывается только за генерацию.
+    // Попадание в кэш не тратит квоту — списываем только за генерацию.
     if (!result.cached) {
       registerGeneration(user.id);
     }
 
     const draft = createAiDraft({
-      topic,
-      normalizedTopic: normalizeTopic(topic),
+      topic: parsedUrl.href,
+      normalizedTopic: normalizeTopic(parsedUrl.href),
       payload: result.data,
       valid: true,
     });
@@ -67,15 +83,16 @@ export async function POST(request: NextRequest) {
       {
         draftId: draft.id,
         data: result.data,
+        provider: result.provider,
         remainingQuota: Math.max(0, perDay - countGenerationsToday(user.id)),
         cached: Boolean(result.cached),
       },
       { status: 201 }
     );
   } catch (error) {
-    if (error instanceof RateLimitError) {
+    if (error instanceof AiGatewayError && error.status === 429) {
       return NextResponse.json(
-        { error: error.message, retryAfterSeconds: error.retryAfterSeconds },
+        { error: "Лимит ИИ-шлюза исчерпан, попробуйте позже" },
         { status: 429 }
       );
     }
@@ -84,4 +101,33 @@ export async function POST(request: NextRequest) {
       { status: 502 }
     );
   }
+}
+
+/**
+ * Только публичные http(s)-адреса: никакой localhost, внутренней сети
+ * и нестандартных схем — пользовательский ввод не превращается в SSRF.
+ */
+function parseSourceUrl(raw: string): URL | null {
+  if (raw.length === 0 || raw.length > 2000) return null;
+  let parsed: URL;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    return null;
+  }
+  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return null;
+  const host = parsed.hostname.toLowerCase();
+  if (
+    host === "localhost" ||
+    host.endsWith(".localhost") ||
+    host.endsWith(".local") ||
+    host.endsWith(".internal") ||
+    // Голый IPv4 (включая приватные диапазоны 10.x, 192.168.x, 169.254.x) — сразу нет.
+    /^\d{1,3}(\.\d{1,3}){3}$/.test(host) ||
+    host === "0.0.0.0" ||
+    host === "[::1]"
+  ) {
+    return null;
+  }
+  return parsed;
 }
