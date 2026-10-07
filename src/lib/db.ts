@@ -329,6 +329,11 @@ export const imageAssetStore = {
     const row = imageAssets.find((a) => a.id === id);
     if (row) row.fileUrl = fileUrl;
   },
+
+  async remove(id: string): Promise<void> {
+    const index = imageAssets.findIndex((a) => a.id === id);
+    if (index !== -1) imageAssets.splice(index, 1);
+  },
 };
 
 let draftSeq = 0;
