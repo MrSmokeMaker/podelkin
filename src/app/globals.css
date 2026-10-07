@@ -15,6 +15,19 @@
   }
 }
 
+/* Заголовки: плотный гротеск Geist, вес 800, увеличенный межбуквенный интервал.
+   Правило намеренно вне @layer — перекрывает утилиты tracking-tight/font-bold,
+   чтобы заголовки на всех страницах были в едином выразительном стиле. */
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  font-weight: 800;
+  letter-spacing: 0.015em;
+  text-wrap: balance;
+}
+
 @layer utilities {
   /* Едва заметная бумажная текстура поверх пастельного фона */
   .paper-texture {

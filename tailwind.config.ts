@@ -98,7 +98,10 @@ export default {
         },
       },
       fontFamily: {
-        sans: ["var(--font-geist-sans)", ...fontFamily.sans],
+        // Основной текст — системный стек: мягкий, отлично читается в мелком кегле
+        sans: [...fontFamily.sans],
+        // Заголовки — плотный гротеск Geist (см. базовое правило в globals.css)
+        display: ["var(--font-geist-sans)", ...fontFamily.sans],
         mono: ["var(--font-geist-mono)", ...fontFamily.mono],
       },
       borderRadius: {
