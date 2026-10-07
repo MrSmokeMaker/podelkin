@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   CheckCircle2,
   Clock,
@@ -68,6 +68,99 @@ function Chip({ className, children }: { className?: string; children: ReactNode
     >
       {children}
     </span>
+  );
+}
+
+function ElapsedSeconds() {
+  const [seconds, setSeconds] = useState(0);
+  useEffect(() => {
+    const started = Date.now();
+    const timer = setInterval(
+      () => setSeconds(Math.floor((Date.now() - started) / 1000)),
+      1000
+    );
+    return () => clearInterval(timer);
+  }, []);
+  return <span className="tabular-nums">{seconds} с</span>;
+}
+
+/* Детерминированная обложка-заглушка: палитра и фигуры выводятся из хэша
+   промпта, поэтому одна и та же поделка всегда получает одну и ту же SVG. */
+const COVER_PALETTES = [
+  ["#F2D9CC", "#C77B58"], // clay
+  ["#E4EBDC", "#9CAF88"], // sage
+  ["#F5E9D2", "#DDB771"], // sand
+  ["#F4DFE6", "#C98DA4"], // blush
+  ["#DDE8F0", "#8FAEC7"], // mist
+];
+
+function hashSeed(value: string): number {
+  let hash = 0;
+  for (let i = 0; i < value.length; i++) {
+    hash = (hash * 31 + value.charCodeAt(i)) | 0;
+  }
+  return Math.abs(hash) >>> 0;
+}
+
+function CoverSvg({
+  seedValue,
+  className,
+}: {
+  seedValue: string;
+  className?: string;
+}) {
+  const seed = hashSeed(seedValue);
+  const [from, to] = COVER_PALETTES[seed % COVER_PALETTES.length];
+  const x1 = 15 + (seed % 70);
+  const y1 = 15 + (Math.floor(seed / 7) % 60);
+  const x2 = 30 + (Math.floor(seed / 49) % 55);
+  const y2 = 35 + (Math.floor(seed / 343) % 50);
+  const r1 = 18 + (Math.floor(seed / 2401) % 22);
+  const r2 = 12 + (Math.floor(seed / 16807) % 18);
+  const gid = `cover-grad-${seed.toString(36)}`;
+  return (
+    <svg viewBox="0 0 100 100" className={className} aria-hidden>
+      <defs>
+        <linearGradient id={gid} x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor={from} />
+          <stop offset="100%" stopColor={to} />
+        </linearGradient>
+      </defs>
+      <rect width="100" height="100" fill={`url(#${gid})`} opacity="0.55" />
+      <circle cx={x1} cy={y1} r={r1} fill={to} opacity="0.35" />
+      <circle cx={x2} cy={y2} r={r2} fill={from} opacity="0.8" />
+      <circle cx={100 - x1} cy={100 - y1} r={r2} fill="#F7F2EA" opacity="0.5" />
+    </svg>
+  );
+}
+
+function CraftCover({
+  url,
+  alt,
+  seedValue,
+}: {
+  url: string;
+  alt: string;
+  seedValue: string;
+}) {
+  const [loaded, setLoaded] = useState(false);
+  const [failed, setFailed] = useState(false);
+  return (
+    <div className="relative mt-4 overflow-hidden rounded-2xl ring-1 ring-ink/10">
+      <CoverSvg seedValue={seedValue} className="aspect-square w-full" />
+      {!failed && (
+        <img
+          src={url}
+          alt={alt}
+          onLoad={() => setLoaded(true)}
+          onError={() => setFailed(true)}
+          className={cn(
+            "absolute inset-0 h-full w-full object-cover transition-opacity duration-500",
+            loaded ? "opacity-100" : "opacity-0"
+          )}
+        />
+      )}
+    </div>
   );
 }
 
@@ -288,7 +381,9 @@ export function GenerateCraft() {
             aria-hidden
           />
           <div>
-            <p className="text-sm font-bold">Groq пишет черновик…</p>
+            <p className="text-sm font-bold">
+              Думаю… <ElapsedSeconds />
+            </p>
             <p className="mt-0.5 text-xs text-ink-soft">
               Обычно 5–20 секунд. Если ответ не пройдёт валидацию, будет ровно
               один автоматический повтор.
@@ -349,26 +444,26 @@ export function GenerateCraft() {
           </ol>
 
           <h3 className="mt-5 text-sm font-bold">Материалы</h3>
-          <ul className="mt-3 divide-y divide-ink/5 rounded-xl bg-paper-deep/40 px-4">
+          <div className="mt-3 flex flex-wrap gap-2">
             {draft.data.materials.map((material) => (
-              <li
+              <Chip
                 key={material.name}
-                className="flex items-baseline justify-between gap-3 py-2.5 text-sm"
+                className={
+                  material.optional
+                    ? "bg-white text-ink-soft ring-1 ring-ink/15"
+                    : "bg-paper-deep/70"
+                }
               >
-                <span>
-                  {material.name}
-                  {material.optional && (
-                    <span className="ml-2 text-xs text-ink-soft">
-                      опционально
-                    </span>
-                  )}
+                {material.name}
+                <span className="font-normal text-ink-soft">
+                  · {material.qty} {material.unit}
                 </span>
-                <span className="shrink-0 font-semibold text-ink-soft">
-                  {material.qty} {material.unit}
-                </span>
-              </li>
+                {material.optional && (
+                  <span className="font-normal text-ink-soft">· опционально</span>
+                )}
+              </Chip>
             ))}
-          </ul>
+          </div>
 
           <h3 className="mt-5 flex items-center gap-2 text-sm font-bold">
             <Wrench className="h-4 w-4 text-clay" aria-hidden />
@@ -435,8 +530,9 @@ export function GenerateCraft() {
             </button>
           </div>
           {phase === "approving" && (
-            <p className="mt-3 animate-pulse text-xs text-ink-soft">
-              Рисуем картинку по промпту — может занять до минуты.
+            <p className="mt-3 text-xs text-ink-soft">
+              Рисуем картинку по промпту… <ElapsedSeconds /> (может занять до
+              минуты).
             </p>
           )}
         </section>
@@ -460,13 +556,11 @@ export function GenerateCraft() {
           </div>
 
           {result.imageUrl ? (
-            <div className="mt-4 overflow-hidden rounded-2xl ring-1 ring-ink/10">
-              <img
-                src={result.imageUrl}
-                alt={`Сгенерированная картинка: ${draft.data.title}`}
-                className="aspect-square w-full object-cover"
-              />
-            </div>
+            <CraftCover
+              url={result.imageUrl}
+              alt={`Сгенерированная картинка: ${draft.data.title}`}
+              seedValue={draft.data.imagePrompt}
+            />
           ) : (
             <div className="mt-4 flex flex-col items-center gap-2 rounded-2xl border-2 border-dashed border-ink/15 p-8 text-center">
               <ImageOff className="h-8 w-8 text-ink-soft" aria-hidden />
