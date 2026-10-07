@@ -16,10 +16,21 @@ export function ShoppingList({ craft }: { craft: Craft }) {
   const total = missingTotal(craft);
 
   const handleExport = () => {
-    showToast(
-      "Список покупок готов",
-      exportListText(craft)
-    );
+    const text = exportListText(craft);
+    try {
+      const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${craft.slug}-spisok-pokupok.txt`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      showToast("Файл .txt сохранён", text);
+    } catch {
+      showToast("Список покупок", text);
+    }
   };
 
   return (
