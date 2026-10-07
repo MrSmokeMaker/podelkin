@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { groqChatJson, RateLimitError } from "./groqClient";
-import { SYSTEM_PROMPT } from "./craftPrompt";
+import { AiGatewayError, workerTextJson } from "./aiClient";
+import { SOURCE_ANALYSIS_PROMPT, TAGS_PROMPT } from "./craftPrompt";
 
 const stepSchema = z.object({
   n: z.number().int().positive(),
@@ -39,7 +39,8 @@ export interface CraftDraftResult {
   data?: CraftDraftData;
   error?: string;
   cached?: boolean;
-  ratelimit?: { remainingRequests: number | null; remainingTokens: number | null };
+  /** Какая из двух сетей ответила (mistral | cloudflare) — для логов и диагностики. */
+  provider?: string;
 }
 
 export interface DraftCacheRow {
@@ -49,7 +50,7 @@ export interface DraftCacheRow {
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
 
-/** Нормализация темы для cache-ключа: регистр, ё, пробелы, пунктуация. */
+/** Нормализация темы/URL для cache-ключа: регистр, ё, пробелы, пунктуация. */
 export function normalizeTopic(topic: string): string {
   return topic
     .toLowerCase()
@@ -58,76 +59,107 @@ export function normalizeTopic(topic: string): string {
     .trim();
 }
 
+/**
+ * Новый поток: текст страницы-источника → Mistral (long) → черновик мастер-класса.
+ * Затем короткий вызов (Cloudflare Mistral) уточняет теги.
+ * Один повтор длинного вызова, если модель вернула невалидный JSON.
+ */
 export async function generateCraftDraft(
-  topic: string,
+  sourceText: string,
   findCachedDraft?: (normalizedTopic: string) => CraftDraftRow | null | Promise<CraftDraftRow | null>
 ): Promise<CraftDraftResult> {
   const cacheEnabled = process.env.CACHE_LLM === "true";
 
   if (cacheEnabled && findCachedDraft) {
-    const cached = await findCachedDraft(normalizeTopic(topic));
+    const cached = await findCachedDraft(normalizeTopic(sourceText.slice(0, 500)));
     if (cached) {
       return { valid: true, data: cached.payload as CraftDraftData, cached: true };
     }
   }
 
-  const first = await callGroqWithValidation(topic, false);
+  const first = await callSourceAnalysis(sourceText, false);
   if (first.valid) {
-    return first;
-  }
-  if (first.ratelimitError) {
-    throw first.ratelimitError;
+    return finalizeTags(first);
   }
 
   // Ровно один повтор с дополнительной инструкцией «только валидный JSON».
-  const second = await callGroqWithValidation(topic, true);
+  const second = await callSourceAnalysis(sourceText, true);
   if (second.valid) {
-    return second;
-  }
-  if (second.ratelimitError) {
-    throw second.ratelimitError;
+    return finalizeTags(second);
   }
 
-  return { valid: false, error: "Модель вернула некорректный JSON" };
+  return { valid: false, error: second.error ?? "Модель вернула некорректный JSON" };
 }
 
-interface CallOutcome extends CraftDraftResult {
-  ratelimitError?: RateLimitError;
-}
-
-async function callGroqWithValidation(
-  topic: string,
+async function callSourceAnalysis(
+  sourceText: string,
   retry: boolean
-): Promise<CallOutcome> {
+): Promise<CraftDraftResult> {
   const userPrompt = retry
-    ? `Тема: ${topic}\n\nПредыдущий ответ не был валидным JSON. Верни валидный JSON only — без markdown, без комментариев, только объект по схеме.`
-    : `Тема: ${topic}`;
+    ? `Текст страницы-источника:\n\n${sourceText}\n\nПредыдущий ответ не был валидным JSON. Верни валидный JSON — без markdown, без комментариев, только объект по схеме.`
+    : `Текст страницы-источника:\n\n${sourceText}`;
 
   let result;
   try {
-    result = await groqChatJson(SYSTEM_PROMPT, userPrompt);
+    result = await workerTextJson({
+      system: SOURCE_ANALYSIS_PROMPT,
+      prompt: userPrompt,
+      mode: "long",
+      maxTokens: 2800,
+    });
   } catch (error) {
-    if (error instanceof RateLimitError) {
-      return { valid: false, ratelimitError: error };
+    // Квоту шлюза (429) пробрасываем: роутер покажет пользователю честный лимит.
+    if (error instanceof AiGatewayError && error.status === 429) {
+      throw error;
     }
     return {
       valid: false,
-      error: error instanceof Error ? error.message : "Ошибка сети Groq",
+      error: error instanceof Error ? error.message : "Ошибка сети ИИ-шлюза",
     };
   }
 
   const parsed = draftSchema.safeParse(result.data);
   if (!parsed.success) {
-    return { valid: false, error: "Схема ответа не прошла валидацию", ratelimit: result.ratelimit };
+    return { valid: false, error: "Схема ответа не прошла валидацию", provider: result.provider };
   }
 
   const data = normalizeDraft(parsed.data);
   const verified = draftSchema.safeParse(data);
   if (!verified.success) {
-    return { valid: false, error: "Схема ответа не прошла валидацию", ratelimit: result.ratelimit };
+    return { valid: false, error: "Схема ответа не прошла валидацию", provider: result.provider };
   }
 
-  return { valid: true, data: verified.data, ratelimit: result.ratelimit };
+  return { valid: true, data: verified.data, provider: result.provider };
+}
+
+/** Короткий вызов: финальные теги. Сбой не валит черновик — остаются теги из long-вызова. */
+async function finalizeTags(draft: CraftDraftResult): Promise<CraftDraftResult> {
+  if (!draft.data) {
+    return draft;
+  }
+  try {
+    const result = await workerTextJson({
+      system: TAGS_PROMPT,
+      prompt: `Заголовок: ${draft.data.title}\nКатегория: ${draft.data.category}\nКратко: ${draft.data.summary}`,
+      mode: "short",
+      maxTokens: 300,
+    });
+    const tags = (result.data as { tags?: unknown }).tags;
+    if (Array.isArray(tags)) {
+      const clean = tags
+        .filter((t): t is string => typeof t === "string")
+        .map((t) => t.trim().toLowerCase())
+        .filter(Boolean)
+        .slice(0, 5);
+      if (clean.length > 0) {
+        draft.data.tags = clean;
+        draft.provider = result.provider;
+      }
+    }
+  } catch {
+    // Теги — украшение: при сбое короткого вызова оставляем теги long-вызова.
+  }
+  return draft;
 }
 
 function normalizeDraft(data: CraftDraftData): CraftDraftData {
