@@ -14,5 +14,17 @@
       "type": "image/svg+xml",
       "purpose": "any"
     }
+  ],
+  "shortcuts": [
+    {
+      "name": "Каталог поделок",
+      "url": "/podelki",
+      "description": "Бумажные модели и деревянные заготовки"
+    },
+    {
+      "name": "Избранное",
+      "url": "/podelki/favorites",
+      "description": "Поделки, отмеченные сердечком"
+    }
   ]
 }

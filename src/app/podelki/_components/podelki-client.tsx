@@ -5,6 +5,8 @@ import Link from "next/link";
 import { Clock, Loader2, Plus, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { categoryIcon, DIFFICULTY_STYLES } from "./catalog-visuals";
+import { InstallBanner } from "./install-banner";
+import { loadCatalogOffline, saveCatalogOffline } from "@/lib/catalog-offline";
 import type { CatalogItem } from "@/lib/catalog-db";
 
 /* Константы продублированы локально: catalog-db лежит на сервере
@@ -146,6 +148,7 @@ export function PodelkiClient() {
   const [difficulty, setDifficulty] = useState<string | null>(null);
   const [source, setSource] = useState<string | null>(null);
   const [sort, setSort] = useState<SortKey>("new");
+  const [offline, setOffline] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -154,14 +157,23 @@ export function PodelkiClient() {
         if (!response.ok) throw new Error(String(response.status));
         return response.json() as Promise<{ items: CatalogItem[] }>;
       })
-      .then((data) => {
-        if (!cancelled) {
-          setItems(data.items);
-          setStatus("ready");
-        }
+      .then(async (data) => {
+        if (cancelled) return;
+        setItems(data.items);
+        setOffline(false);
+        setStatus("ready");
+        await saveCatalogOffline(data.items).catch(() => {});
       })
-      .catch(() => {
-        if (!cancelled) setStatus("error");
+      .catch(async () => {
+        const saved = await loadCatalogOffline<CatalogItem[]>().catch(() => null);
+        if (cancelled) return;
+        if (saved && saved.length > 0) {
+          setItems(saved);
+          setOffline(true);
+          setStatus("ready");
+        } else {
+          setStatus("error");
+        }
       });
     return () => {
       cancelled = true;
@@ -268,6 +280,12 @@ export function PodelkiClient() {
         </div>
       </div>
 
+      {offline && status === "ready" && (
+        <p className="rounded-2xl bg-sand-soft px-4 py-3 text-sm text-ink ring-1 ring-sand/40">
+          Офлайн: показан сохранённый каталог с устройства.
+        </p>
+      )}
+
       {status === "loading" && (
         <p className="flex items-center justify-center gap-2 rounded-2xl bg-white p-8 text-sm text-ink-soft shadow-card ring-1 ring-ink/5">
           <Loader2 aria-hidden className="h-4 w-4 animate-spin" />
@@ -299,6 +317,8 @@ export function PodelkiClient() {
           )}
         </>
       )}
+
+      <InstallBanner />
     </div>
   );
 }
