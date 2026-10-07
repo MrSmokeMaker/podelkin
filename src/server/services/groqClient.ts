@@ -1,5 +1,7 @@
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 
+import { aiStats } from "@/lib/db";
+
 export class RateLimitError extends Error {
   retryAfterSeconds: number;
 
@@ -87,6 +89,9 @@ export async function groqChatJson(
   } catch {
     throw new Error("Groq вернул ответ, не являющийся JSON");
   }
+
+  // Считаем только фактически завершённые вызовы (не 429/5xx), включая ретраи.
+  aiStats.llmCalls += 1;
 
   return { data, ratelimit };
 }
