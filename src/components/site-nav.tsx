@@ -2,13 +2,23 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Boxes, ChartPie, House, LayoutGrid, Scissors } from "lucide-react";
+import {
+  Boxes,
+  ChartPie,
+  Download,
+  House,
+  Layers,
+  LayoutGrid,
+  Scissors,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const links = [
   { href: "/", label: "Главная", icon: House },
   { href: "/catalog", label: "Каталог", icon: LayoutGrid },
   { href: "/inventory", label: "Запасы", icon: Boxes },
+  { href: "/boards", label: "Доски", icon: Layers },
+  { href: "/export", label: "Экспорт", icon: Download },
   { href: "/stats", label: "Статистика", icon: ChartPie },
 ];
 

@@ -1,37 +1,27 @@
 import { NextResponse } from "next/server";
-import type { Material } from "@/data/mockData";
-import { boards, crafts, inventory, priceBook, projects } from "@/lib/db";
+import type { Difficulty } from "@/data/mockData";
+import { getAuthUser } from "@/lib/auth";
+import { crafts, inventory } from "@/lib/db";
 import { collectCost } from "@/lib/cost-calculator";
-import { craftMinutes, formatRub } from "@/lib/crafts";
+import { craftMinutes } from "@/lib/crafts";
 
 export const dynamic = "force-dynamic";
 
-/* Сводная статистика: расходы, средние показатели, топ материалов,
-   оценка экономии за счёт запасов. Цены — из прайс-бука с датой. */
+/* GET /api/stats?role=free|premium|admin
+   free — только базовые поля (totalCrafts, avgTime, avgCost, mostUsedMaterial);
+   premium/admin — плюс расширенная аналитика. Права решает мок-аутентификация. */
 
-function coveredValue(craftMaterials: Material[]): number {
-  let value = 0;
-  for (const material of craftMaterials) {
-    const record = inventory.find((i) => i.name === material.name);
-    const priceItem = priceBook.find((p) => p.name === material.name);
-    if (!record || !priceItem) continue;
-    const used = Math.min(record.stock, material.qty);
-    /* цена в прайсе за baseUnit; для штучных позиций baseUnit совпадает с unit */
-    const perUnit = priceItem.baseUnit === material.unit
-      ? priceItem.price
-      : material.price;
-    value += used * perUnit;
-  }
-  return Math.round(value * 100) / 100;
-}
+const DIFFICULTIES: Difficulty[] = ["Легко", "Средне", "Сложно"];
 
-export function GET() {
+export function GET(request: Request) {
+  const user = getAuthUser(request);
   const totalCrafts = crafts.length;
-  const avgMinutes =
-    crafts.reduce((sum, craft) => sum + craftMinutes(craft), 0) / totalCrafts;
+
+  const avgTime = Math.round(
+    crafts.reduce((sum, craft) => sum + craftMinutes(craft), 0) / totalCrafts
+  );
   const costs = crafts.map((craft) => collectCost(craft));
-  const avgCost =
-    costs.reduce((sum, cost) => sum + cost.baseCost, 0) / totalCrafts;
+  const avgCost = costs.reduce((sum, cost) => sum + cost.baseCost, 0) / totalCrafts;
 
   const usage = new Map<string, number>();
   for (const craft of crafts) {
@@ -39,48 +29,66 @@ export function GET() {
       usage.set(material.name, (usage.get(material.name) ?? 0) + 1);
     }
   }
-  const mostUsedMaterials = [...usage.entries()]
+  const mostUsed = [...usage.entries()].sort((a, b) => b[1] - a[1])[0];
+
+  const payload: Record<string, unknown> = {
+    role: user.role,
+    generatedAt: new Date().toISOString(),
+    totalCrafts,
+    avgTime,
+    avgCost: Math.round(avgCost),
+    mostUsedMaterial: mostUsed ? { name: mostUsed[0], count: mostUsed[1] } : null,
+  };
+
+  if (!user.features.allowed.includes("advancedStats")) {
+    return NextResponse.json(payload);
+  }
+
+  /* --- Расширенная аналитика: только premium/admin --- */
+
+  const costByCategory = new Map<string, number>();
+  const timeByDifficulty = new Map<Difficulty, number>();
+  for (const craft of crafts) {
+    costByCategory.set(
+      craft.category,
+      (costByCategory.get(craft.category) ?? 0) + collectCost(craft).baseCost
+    );
+    timeByDifficulty.set(
+      craft.difficulty,
+      (timeByDifficulty.get(craft.difficulty) ?? 0) + craftMinutes(craft)
+    );
+  }
+
+  let savingsEstimate = 0;
+  for (const craft of crafts) {
+    for (const material of craft.materials) {
+      const stock = inventory.find((i) => i.name === material.name)?.stock ?? 0;
+      savingsEstimate += Math.min(stock, material.qty) * material.price;
+    }
+  }
+
+  const avgUsage =
+    [...usage.values()].reduce((sum, count) => sum + count, 0) / usage.size;
+  const topMaterialsWithTrend = [...usage.entries()]
     .sort((a, b) => b[1] - a[1])
     .slice(0, 5)
-    .map(([name, count]) => ({ name, count }));
-
-  const plannedSpend = costs.reduce((sum, cost) => sum + cost.baseCost, 0);
-  const savings = projects.reduce((sum, project) => {
-    const craft = crafts.find((c) => c.slug === project.craftSlug);
-    return sum + (craft ? coveredValue(craft.materials) : 0);
-  }, 0);
+    .map(([name, count]) => ({
+      name,
+      count,
+      /* Тренд — плейсхолдер до накопления истории использования */
+      trend: count > avgUsage ? ("up" as const) : ("stable" as const),
+    }));
 
   return NextResponse.json({
-    generatedAt: new Date().toISOString(),
-    priceBook: {
-      size: priceBook.length,
-      pricesUpdatedAt: priceBook[0]?.updatedAt ?? null,
-    },
-    catalog: {
-      totalCrafts,
-      avgMinutes: Math.round(avgMinutes),
-      avgCost: Math.round(avgCost),
-      avgCostLabel: formatRub(avgCost),
-    },
-    inventory: {
-      items: inventory.length,
-      empty: inventory.filter((i) => i.stock === 0).length,
-    },
-    projects: {
-      total: projects.length,
-      finished: projects.filter((p) => p.status === "готов").length,
-      inProgress: projects.filter((p) => p.status === "в работе").length,
-      minutesSpent: projects.reduce(
-        (sum, p) => sum + p.steps.reduce((s, step) => s + step.minutesSpent, 0),
-        0
-      ),
-    },
-    boards: boards.length,
-    spend: {
-      planned: Math.round(plannedSpend),
-      savingsFromStock: Math.round(savings),
-      missingPrices: [...new Set(costs.flatMap((c) => c.missingPrices))],
-    },
-    mostUsedMaterials,
+    ...payload,
+    costBreakdownByCategory: [...costByCategory.entries()]
+      .map(([category, cost]) => ({ category, cost: Math.round(cost) }))
+      .sort((a, b) => b.cost - a.cost),
+    timeBreakdownByDifficulty: DIFFICULTIES.map((difficulty) => ({
+      difficulty,
+      minutes: timeByDifficulty.get(difficulty) ?? 0,
+    })),
+    savingsEstimate: Math.round(savingsEstimate),
+    topMaterialsWithTrend,
   });
 }
