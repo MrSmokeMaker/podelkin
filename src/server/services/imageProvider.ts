@@ -16,7 +16,11 @@ export interface ImageRenderResult {
   provider: string;
 }
 
-export type ImageProvider = (prompt: string, seed: number) => Promise<ImageRenderResult>;
+export type ImageProvider = (
+  prompt: string,
+  seed: number,
+  assetId?: string
+) => Promise<ImageRenderResult>;
 
 interface CloudflareResponse {
   result?: { image?: string };
@@ -32,8 +36,17 @@ const registry: Record<string, ImageProvider> = {
   pollinations: renderPollinations,
 };
 
+/* Правило из спеки: pollinations разрешён только вне production.
+   В production водяной провайдер не используется, даже если env просит его. */
+export function resolveProviderName(): string {
+  const requested = process.env.IMAGE_PROVIDER;
+  const isProduction = process.env.NODE_ENV === "production";
+  if (requested === "pollinations" && !isProduction) return "pollinations";
+  return "cloudflare";
+}
+
 export function getImageProvider(): ImageProvider {
-  const name = process.env.IMAGE_PROVIDER || "pollinations";
+  const name = resolveProviderName();
   const provider = registry[name];
   if (!provider) {
     throw new Error(
@@ -43,7 +56,11 @@ export function getImageProvider(): ImageProvider {
   return provider;
 }
 
-async function renderCloudflare(prompt: string, seed: number): Promise<ImageRenderResult> {
+async function renderCloudflare(
+  prompt: string,
+  seed: number,
+  assetId?: string
+): Promise<ImageRenderResult> {
   const accountId = process.env.CF_ACCOUNT_ID;
   const apiToken = process.env.CF_API_TOKEN;
   if (!accountId || !apiToken) {
@@ -82,18 +99,18 @@ async function renderCloudflare(prompt: string, seed: number): Promise<ImageRend
     throw new Error("Cloudflare не вернул изображение");
   }
 
-  const url = await writeAssetFile(base64);
+  const url = await writeAssetFile(base64, assetId);
   return { url, provider: "cloudflare" };
 }
 
-async function writeAssetFile(base64: string): Promise<string> {
+async function writeAssetFile(base64: string, assetId?: string): Promise<string> {
   const fs = await import("node:fs/promises");
   const path = await import("node:path");
 
   const dir = path.join(process.cwd(), "uploads", "crafts");
   await fs.mkdir(dir, { recursive: true });
 
-  const filename = `craft-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`;
+  const filename = `${assetId ?? `craft-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`}.jpg`;
   await fs.writeFile(path.join(dir, filename), Buffer.from(base64, "base64"));
   return `/img/${filename}`;
 }
