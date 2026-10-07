@@ -1,11 +1,12 @@
-# Конфиг воркера (cloudflare/worker.js). Деплой — с машины с интернетом:
+# AI-шлюз «Рукоделия» (cloudflare/worker.js). Деплой — с машины с интернетом:
 #   cd cloudflare && npx wrangler deploy
 name = "craft-image-worker"
 main = "worker.js"
 compatibility_date = "2024-12-01"
 account_id = "6a0502dbb518e85671b14a73e91dddf5"
 
-# Биндинг Workers AI — даёт env.AI.run("@cf/black-forest-labs/flux-1-schnell", ...)
+# Биндинг Workers AI (env.AI): FLUX-1-schnell для картинок,
+# @cf/mistralai/mistral-small-3.1-24b-instruct для коротких текстов и fallback.
 [ai]
 binding = "AI"
 
