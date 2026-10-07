@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
 import {
   Boxes,
   ChartPie,
@@ -37,26 +36,10 @@ const mobileLinks = [
 
 export function SiteHeader() {
   const pathname = usePathname();
-  const [scrolled, setScrolled] = useState(false);
-
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 8);
-    onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-
   if (pathname.startsWith("/build/")) return null;
 
   return (
-    <header
-      className={cn(
-        "sticky top-0 z-40 border-b bg-paper/90 backdrop-blur transition-shadow",
-        scrolled
-          ? "border-ink/10 shadow-card"
-          : "border-transparent shadow-none"
-      )}
-    >
+    <header className="sticky top-0 z-40 border-b border-ink/10 bg-paper/90 backdrop-blur">
       <div className="mx-auto flex h-16 w-full max-w-5xl items-center justify-between px-4">
         <Link href="/" className="flex items-center gap-2.5 py-2">
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-clay text-paper shadow-card">
@@ -110,23 +93,15 @@ export function BottomNav() {
             <Link
               key={href}
               href={href}
-              aria-current={active ? "page" : undefined}
               className={cn(
                 "flex min-h-[3.75rem] flex-col items-center justify-center gap-1 text-[11px] font-medium transition-colors",
                 active ? "text-[#8A4A2C]" : "text-ink-soft"
               )}
             >
-              <span
-                className={cn(
-                  "flex h-7 w-14 items-center justify-center rounded-full transition-colors",
-                  active && "bg-clay-soft"
-                )}
-              >
-                <Icon
-                  className={cn("h-5 w-5", active && "text-clay")}
-                  strokeWidth={active ? 2.4 : 2}
-                />
-              </span>
+              <Icon
+                className={cn("h-5 w-5", active && "text-clay")}
+                strokeWidth={active ? 2.4 : 2}
+              />
               {label}
             </Link>
           );

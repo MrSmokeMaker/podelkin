@@ -13,14 +13,6 @@
     @apply bg-paper text-ink;
     -webkit-tap-highlight-color: transparent;
   }
-  ::selection {
-    @apply bg-clay text-white;
-  }
-  /* Единое видимое кольцо фокуса для клавиатурной навигации */
-  :focus-visible {
-    outline: 2px solid theme("colors.clay.DEFAULT");
-    outline-offset: 2px;
-  }
 }
 
 @layer utilities {
