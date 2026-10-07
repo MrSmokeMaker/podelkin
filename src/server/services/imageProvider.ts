@@ -1,4 +1,4 @@
-const POLLINATIONS_URL = "https://image.pollinations.ai/prompt";
+import { AiGatewayError, workerImage } from "./aiClient";
 
 export class ImageRateLimitError extends Error {
   retryAfterSeconds: number;
@@ -11,7 +11,7 @@ export class ImageRateLimitError extends Error {
 }
 
 export interface ImageRenderResult {
-  /** Локальный путь файла (cloudflare) либо внешний URL (pollinations). */
+  /** Локальный путь файла: воркер возвращает base64, файл кладём в uploads. */
   url: string;
   provider: string;
 }
@@ -22,88 +22,34 @@ export type ImageProvider = (
   assetId?: string
 ) => Promise<ImageRenderResult>;
 
-interface CloudflareResponse {
-  result?: { image?: string };
-  errors?: unknown[];
-}
-
-/**
- * Реестр провайдеров: вызывающий код не знает, кто активен.
- * Выбор — только через env IMAGE_PROVIDER.
- */
-const registry: Record<string, ImageProvider> = {
-  cloudflare: renderCloudflare,
-  pollinations: renderPollinations,
-  worker: renderViaWorker,
-};
-
-/* Правило из спеки: pollinations разрешён только вне production.
-   В production водяной провайдер не используется, даже если env просит его.
-   Свой воркер (Mistral + FLUX) активен только когда задан WORKER_URL. */
+// Провайдер один — наш воркер (cloudflare/worker.js → FLUX-1-schnell).
+// Прямые вызовы Cloudflare API и pollinations удалены: ключей в приложении больше нет.
 export function resolveProviderName(): string {
-  const requested = process.env.IMAGE_PROVIDER;
-  const isProduction = process.env.NODE_ENV === "production";
-  if (requested === "pollinations" && !isProduction) return "pollinations";
-  if (requested === "worker" && process.env.WORKER_URL) return "worker";
-  return "cloudflare";
+  return "worker";
 }
 
 export function getImageProvider(): ImageProvider {
-  const name = resolveProviderName();
-  const provider = registry[name];
-  if (!provider) {
-    throw new Error(
-      `Неизвестный IMAGE_PROVIDER "${name}" — доступны: ${Object.keys(registry).join(", ")}`
-    );
-  }
-  return provider;
+  return renderViaWorker;
 }
 
-async function renderCloudflare(
+async function renderViaWorker(
   prompt: string,
   seed: number,
   assetId?: string
 ): Promise<ImageRenderResult> {
-  const accountId = process.env.CF_ACCOUNT_ID;
-  const apiToken = process.env.CF_API_TOKEN;
-  if (!accountId || !apiToken) {
-    throw new Error("CF_ACCOUNT_ID / CF_API_TOKEN не заданы — провайдер cloudflare недоступен");
-  }
-
-  const stepsRaw = Number(process.env.CF_STEPS) || 4;
-  // Schnell умеет не больше 8 шагов — выше качество не растёт, квота тратится.
-  const steps = Math.min(8, Math.max(1, stepsRaw));
-
-  const response = await fetch(
-    `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/@cf/black-forest-labs/flux-1-schnell`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiToken}`,
-      },
-      body: JSON.stringify({ prompt, seed, steps }),
+  let base64: string;
+  try {
+    base64 = await workerImage(prompt, seed);
+  } catch (error) {
+    // Дневная квота Workers AI не восстанавливается ретраем — час тишины.
+    if (error instanceof AiGatewayError && error.status === 429) {
+      throw new ImageRateLimitError(3600);
     }
-  );
-
-  if (response.status === 429) {
-    // Дневная квота не восстанавливается ретраем — сразу час тишины.
-    throw new ImageRateLimitError(3600);
-  }
-
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`Cloudflare Workers AI ${response.status}: ${body.slice(0, 300)}`);
-  }
-
-  const payload = (await response.json()) as CloudflareResponse;
-  const base64 = payload.result?.image;
-  if (!base64) {
-    throw new Error("Cloudflare не вернул изображение");
+    throw error;
   }
 
   const url = await writeAssetFile(base64, assetId);
-  return { url, provider: "cloudflare" };
+  return { url, provider: "worker" };
 }
 
 async function writeAssetFile(base64: string, assetId?: string): Promise<string> {
@@ -116,54 +62,4 @@ async function writeAssetFile(base64: string, assetId?: string): Promise<string>
   const filename = `${assetId ?? `craft-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`}.jpg`;
   await fs.writeFile(path.join(dir, filename), Buffer.from(base64, "base64"));
   return `/img/${filename}`;
-}
-
-/* Провайдер «worker»: наш Cloudflare Worker — Mistral развивает промт,
-   FLUX внутри воркера рисует картинку и возвращает base64.
-   Файл кладём к себе в uploads, чтобы кэш и /img работали одинаково. */
-async function renderViaWorker(
-  prompt: string,
-  _seed: number,
-  assetId?: string
-): Promise<ImageRenderResult> {
-  const workerUrl = process.env.WORKER_URL;
-  if (!workerUrl) {
-    throw new Error("WORKER_URL не задан — провайдер worker недоступен");
-  }
-
-  const response = await fetch(workerUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ prompt }),
-    signal: AbortSignal.timeout(90_000),
-  });
-
-  if (response.status === 429) {
-    throw new ImageRateLimitError(3600);
-  }
-
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`Worker ${response.status}: ${body.slice(0, 300)}`);
-  }
-
-  const payload = (await response.json()) as { image?: string };
-  if (!payload.image) {
-    throw new Error("Воркер не вернул изображение");
-  }
-
-  const url = await writeAssetFile(payload.image, assetId);
-  return { url, provider: "worker" };
-}
-
-function renderPollinations(prompt: string, seed: number): Promise<ImageRenderResult> {
-  // Без ключа, локальные тесты: провайдер клеит водяной знак — в каталог
-  // такие картинки не попадают, для продакшена ставьте cloudflare.
-  return Promise.resolve({ url: pollinationsUrl(prompt, seed), provider: "pollinations" });
-}
-
-// Экспорт для тестов/отладки: сборка URL pollinations без ключа.
-export function pollinationsUrl(prompt: string, seed: number): string {
-  const encoded = encodeURIComponent(prompt);
-  return `${POLLINATIONS_URL}/${encoded}?width=1024&height=1024&model=flux&seed=${seed}&nologo=true`;
 }
