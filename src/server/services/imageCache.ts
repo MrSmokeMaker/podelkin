@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { getImageProvider, ImageRateLimitError } from "./imageProvider";
+import { getImageProvider, resolveProviderName } from "./imageProvider";
 
 const POLL_TIMEOUT_MS = 120_000;
 const POLL_INTERVAL_MS = 2_000;
@@ -15,7 +15,7 @@ export interface ImageAssetRow {
   height: number;
   steps: number;
   hits: number;
-  createdAt: Date;
+  createdAt: string;
 }
 
 export interface ImageAssetStore {
@@ -33,6 +33,8 @@ export interface ImageAssetStore {
   createUniqueViolation(): Error;
   incrementHits(id: string): Promise<void>;
   updateFileUrl(id: string, fileUrl: string): Promise<void>;
+  /** Шаг 5: сбой рендера удаляет строку — ретрай стартует с чистого листа. */
+  remove?(id: string): Promise<void>;
 }
 
 export class P2002UniqueViolation extends Error {
@@ -53,7 +55,11 @@ interface AssetWithCacheInfo {
 export async function getOrCreateAsset(
   prompt: string,
   store: ImageAssetStore,
-  providerFn?: (prompt: string, seed: number) => Promise<{ url: string; provider: string }>
+  providerFn?: (
+    prompt: string,
+    seed: number,
+    assetId?: string
+  ) => Promise<{ url: string; provider: string }>
 ): Promise<AssetWithCacheInfo> {
   const promptHash = hashPrompt(prompt);
 
@@ -63,10 +69,11 @@ export async function getOrCreateAsset(
       await store.incrementHits(existing.id);
       return { asset: existing, fromCache: true };
     }
-    // Строка есть, файла нет — другой процесс уже рендерит; ждём его файл.
+    // Строка есть, файла нет — конкурент уже рендерит; ждём его файл.
     const polled = await pollFileUrl(existing, store);
     if (polled) return { asset: polled, fromCache: true };
-    throw new Error("Не дождались рендера картинки из параллельной задачи");
+    // Таймаут — не ошибка: вызывающий покажет SVG-заглушку.
+    return { asset: existing, fromCache: true };
   }
 
   let row: ImageAssetRow;
@@ -74,25 +81,28 @@ export async function getOrCreateAsset(
     row = await store.create({
       promptHash,
       prompt,
-      provider: process.env.IMAGE_PROVIDER || "pollinations",
-      seed: Math.floor(Math.random() * 2_147_483_647),
+      provider: resolveProviderName(),
+      // Единственное место генерации seed: 0..999999.
+      seed: Math.floor(Math.random() * 1_000_000),
     });
-  } catch (error) {
+  } catch {
     // P2002: конкурент вставил строку раньше нас — перечитываем и ждём его файл.
     row = await handleUniqueViolation(promptHash, store);
     const polled = await pollFileUrl(row, store);
     if (polled) return { asset: polled, fromCache: true };
-    throw new Error("Не дождались рендера картинки из параллельной задачи");
+    return { asset: row, fromCache: true };
   }
 
-  const render = providerFn ?? (() => getImageProvider()(prompt, row.seed));
+  const render =
+    providerFn ?? ((p: string, s: number) => getImageProvider()(p, s, row.id));
   const startedAt = Date.now();
   try {
     const result = await render(prompt, row.seed);
     await store.updateFileUrl(row.id, result.url);
     return { asset: { ...row, fileUrl: result.url }, fromCache: false };
   } catch (error) {
-    if (error instanceof ImageRateLimitError) throw error;
+    // Чистим строку: следующий ретрай сгенерирует новый seed заново.
+    await store.remove?.(row.id);
     throw error;
   } finally {
     if (process.env.NODE_ENV !== "test") {
