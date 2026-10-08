@@ -24,17 +24,10 @@ export default function HomePage() {
         </p>
         <div className="mt-6 flex flex-wrap gap-3">
           <Link
-            href="/catalog"
+            href="/generate"
             className="flex min-h-12 items-center gap-2 rounded-xl bg-clay px-6 py-3 text-sm font-semibold text-paper shadow-card transition hover:bg-[#B06A48] active:scale-[0.98]"
           >
-            <Hammer className="h-4 w-4" />
-            Открыть каталог
-          </Link>
-          <Link
-            href="/generate"
-            className="flex min-h-12 items-center gap-2 rounded-xl bg-white px-6 py-3 text-sm font-semibold text-ink shadow-card ring-1 ring-ink/10 transition hover:bg-paper-deep active:scale-[0.98]"
-          >
-            <Sparkles className="h-4 w-4 text-clay" />
+            <Sparkles className="h-4 w-4" />
             Сгенерировать с AI
           </Link>
           <Link
@@ -87,10 +80,10 @@ export default function HomePage() {
           </div>
           <Link
             href="/catalog"
-            className="hidden shrink-0 items-center gap-1 text-sm font-semibold text-[#8A4A2C] hover:underline sm:flex"
+            className="group flex shrink-0 items-center gap-1 text-sm font-semibold text-[#8A4A2C] hover:underline"
           >
-            Весь каталог
-            <ArrowRight className="h-4 w-4" />
+            Открыть каталог
+            <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
           </Link>
         </div>
         <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
