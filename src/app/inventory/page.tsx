@@ -18,7 +18,7 @@ export default function InventoryPage() {
         </h1>
         <p className="mt-1 text-sm text-ink-soft">
           {inventory.length} наименований на складе мастерской. Нажмите на
-          карточку, чтобы увидеть историю расхода.
+          карточку, чтобы списать материал или докупить его.
         </p>
       </header>
 

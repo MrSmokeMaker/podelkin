@@ -2,14 +2,13 @@
 
 import { useMemo, useState } from "react";
 import { ChevronDown, Plus, ShoppingCart } from "lucide-react";
-import { ProgressBar } from "@/components/progress";
 import { useToast } from "@/components/toast";
 import { crafts, formatQty } from "@/lib/crafts";
 import { addShoppingItems } from "@/lib/shopping-list";
 import { cn } from "@/lib/utils";
 import type { StockItem } from "@/data/mockData";
 
-/* Ёмкость склада по единице измерения — от неё считается заполненность шкалы. */
+/* Ёмкость склада по единице измерения — от неё считается остаток для светофора. */
 const MAX_BY_UNIT: Record<string, number> = {
   мл: 500,
   м: 100,
@@ -19,22 +18,38 @@ const MAX_BY_UNIT: Record<string, number> = {
   шт: 5,
 };
 
-type Threshold = {
-  tone: "red" | "amber" | "green";
-  label: string;
-  labelClass: string;
+type Tone = "red" | "amber" | "green";
+
+function percentOf(item: StockItem): number {
+  const max = MAX_BY_UNIT[item.unit] ?? 5;
+  return Math.min(100, Math.round((item.stock / max) * 100));
+}
+
+/* Светофор остатка: <20% — мало, <50% — средне, дальше — много.
+   В дефолтном виде — только кружок и слово, без цифр и процентов. */
+function toneOf(percent: number): Tone {
+  if (percent < 20) return "red";
+  if (percent < 50) return "amber";
+  return "green";
+}
+
+const TONE_DOT: Record<Tone, string> = {
+  red: "bg-red-500",
+  amber: "bg-amber-400",
+  green: "bg-sage",
 };
 
-/* Пороги остатка: <20% — красный, <50% — жёлтый, дальше — зелёный. */
-function thresholdOf(percent: number): Threshold {
-  if (percent < 20) {
-    return { tone: "red", label: "Мало", labelClass: "text-red-700" };
-  }
-  if (percent < 50) {
-    return { tone: "amber", label: "Достаточно", labelClass: "text-amber-700" };
-  }
-  return { tone: "green", label: "Полный", labelClass: "text-[#55693F]" };
-}
+const TONE_LABEL: Record<Tone, string> = {
+  red: "Мало",
+  amber: "Средне",
+  green: "Много",
+};
+
+const TONE_TEXT: Record<Tone, string> = {
+  red: "text-red-700",
+  amber: "text-amber-700",
+  green: "text-[#55693F]",
+};
 
 function pluralRu(n: number, one: string, few: string, many: string): string {
   const mod10 = n % 10;
@@ -44,7 +59,7 @@ function pluralRu(n: number, one: string, few: string, many: string): string {
   return many;
 }
 
-/* Максимум, сколько материала уходит на один мастер-класс — по нему
+/* Максимум, сколько материала уходит на один мастер-класс, — по нему
    считаем, на сколько проектов хватит остатка. */
 function usageByName(): Map<string, number> {
   const usage = new Map<string, number>();
@@ -61,69 +76,112 @@ function contextOf(stock: number, unit: string, need: number): string {
   if (need > 0) {
     const projects = Math.floor(stock / need);
     if (projects === 0) return "меньше, чем на 1 проект";
-    return `~${projects} ${pluralRu(projects, "проект", "проекта", "проектов")}`;
+    return `хватит на ~${projects} ${pluralRu(projects, "проект", "проекта", "проектов")}`;
   }
   return "в запасе мастерской";
 }
 
-type FilterId = "all" | "low" | "clay" | "fabric" | "findings";
+function hashName(name: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < name.length; i++) {
+    h ^= name.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+const SWATCH_BASE = ["#F2D9CC", "#E4EBDC", "#F5E9D2", "#F4DFE6", "#DDE8F0"];
+const SWATCH_ACCENT = ["#C77B58", "#9CAF88", "#DDB771", "#C98DA4", "#8FAEC7"];
+
+/* Фото материала: детерминированная композиция из хеша названия
+   (реальных фото в данных нет, свотч держит стиль и различает позиции). */
+function MaterialSwatch({ name, className }: { name: string; className?: string }) {
+  const seed = hashName(name);
+  const accent = SWATCH_ACCENT[seed % SWATCH_ACCENT.length];
+  const base = SWATCH_BASE[seed % SWATCH_BASE.length];
+  let s = seed;
+  const rand = () => {
+    s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
+    return s / 4294967296;
+  };
+  const shapes = Array.from({ length: 5 }, () => {
+    const x = 30 + rand() * 340;
+    const y = 25 + rand() * 210;
+    const r = 18 + rand() * 52;
+    const tone = rand() < 0.6 ? accent : "#FFFFFF";
+    const opacity = 0.14 + rand() * 0.26;
+    if (rand() < 0.55) {
+      return (
+        <circle
+          key={`${x}-${y}`}
+          cx={x}
+          cy={y}
+          r={r}
+          fill={tone}
+          opacity={opacity}
+        />
+      );
+    }
+    return (
+      <rect
+        key={`${x}-${y}`}
+        x={x - r}
+        y={y - r / 2.4}
+        width={r * 2}
+        height={r / 1.2}
+        rx={r / 3}
+        fill={tone}
+        opacity={opacity}
+        transform={`rotate(${Math.round(rand() * 60 - 30)} ${x} ${y})`}
+      />
+    );
+  });
+  return (
+    <svg
+      viewBox="0 0 400 260"
+      preserveAspectRatio="xMidYMid slice"
+      role="img"
+      aria-label={`Материал: ${name}`}
+      className={className}
+    >
+      <rect width="400" height="260" fill={base} />
+      {shapes}
+    </svg>
+  );
+}
+
+type FilterId = "all" | Tone;
 
 const FILTERS: { id: FilterId; label: string }[] = [
   { id: "all", label: "Все" },
-  { id: "low", label: "Мало остатка" },
-  { id: "clay", label: "Глина" },
-  { id: "fabric", label: "Ткань" },
-  { id: "findings", label: "Фурнитура" },
+  { id: "red", label: "🟥 Мало" },
+  { id: "amber", label: "🟨 Средне" },
+  { id: "green", label: "🟩 Много" },
 ];
 
-function groupOf(name: string): FilterId | null {
-  const n = name.toLowerCase();
-  if (n.includes("глин") || n.includes("глазур") || n.includes("шликер")) {
-    return "clay";
-  }
-  if (
-    n.includes("ткан") ||
-    n.includes("джинс") ||
-    n.includes("синтепон") ||
-    n.includes("шнур") ||
-    n.includes("пряж") ||
-    n.includes("шерст") ||
-    n.includes("мулине") ||
-    n.includes("нитк")
-  ) {
-    return "fabric";
-  }
-  if (
-    n.includes("швенз") ||
-    n.includes("булав") ||
-    n.includes("бусин") ||
-    n.includes("глазк") ||
-    n.includes("фитил")
-  ) {
-    return "findings";
-  }
-  return null;
+function updatedLabel(days: number): string {
+  if (days <= 0) return "только что";
+  if (days === 1) return "вчера";
+  if (days < 7) return `${days} дн. назад`;
+  return `${Math.floor(days / 7)} нед. назад`;
 }
 
 export function InventoryClient({ items }: { items: StockItem[] }) {
   const showToast = useToast();
   const [filter, setFilter] = useState<FilterId>("all");
   const [openName, setOpenName] = useState<string | null>(null);
+  const [list, setList] = useState(items);
+  const [fresh, setFresh] = useState<Set<string>>(new Set());
+  const [busyName, setBusyName] = useState<string | null>(null);
   const usage = useMemo(usageByName, []);
 
-  const visible = items.filter((item) => {
-    const max = MAX_BY_UNIT[item.unit] ?? 5;
-    const percent = Math.min(100, Math.round((item.stock / max) * 100));
-    if (filter === "low") return percent < 20;
+  const visible = list.filter((item) => {
     if (filter === "all") return true;
-    return groupOf(item.name) === filter;
+    return toneOf(percentOf(item)) === filter;
   });
 
   const addToShoppingList = () => {
-    const low = items.filter((item) => {
-      const max = MAX_BY_UNIT[item.unit] ?? 5;
-      return Math.min(100, Math.round((item.stock / max) * 100)) < 20;
-    });
+    const low = list.filter((item) => percentOf(item) < 20);
     if (low.length === 0) {
       showToast("Докупать нечего", "Все запасы выше минимального порога");
       return;
@@ -144,6 +202,59 @@ export function InventoryClient({ items }: { items: StockItem[] }) {
         ? `В списке покупок: +${added} ${pluralRu(added, "позиция", "позиции", "позиций")}`
         : "Эти позиции уже в списке",
       "Кнопка «Покупки» — в шапке сверху"
+    );
+  };
+
+  /* Списание одним тапом: вычитаем расход на один проект через существующий
+     POST /api/inventory (upsert остатка) и обновляем карточку оптимистично. */
+  const writeOff = async (item: StockItem) => {
+    if (item.stock <= 0) {
+      showToast("Позиция пуста", `«${item.name}» — сначала докупить`);
+      return;
+    }
+    const need = usage.get(item.name) ?? 0;
+    const amount = need > 0 ? Math.min(need, item.stock) : item.stock;
+    const nextStock = Math.round((item.stock - amount) * 1000) / 1000;
+    setBusyName(item.name);
+    try {
+      const res = await fetch("/api/inventory", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: item.name,
+          stock: nextStock,
+          unit: item.unit,
+        }),
+      });
+      if (!res.ok) throw new Error(`inventory POST ${res.status}`);
+      setList((prev) =>
+        prev.map((i) => (i.name === item.name ? { ...i, stock: nextStock } : i))
+      );
+      setFresh((prev) => new Set(prev).add(item.name));
+      showToast(
+        `Списано: ${formatQty(amount)} ${item.unit}`,
+        `${item.name} — расход на один проект`
+      );
+    } catch {
+      showToast("Не получилось списать", "Проверьте связь и попробуйте ещё раз");
+    } finally {
+      setBusyName(null);
+    }
+  };
+
+  const buyOne = (item: StockItem) => {
+    const need = usage.get(item.name) ?? 0;
+    const { added } = addShoppingItems([
+      {
+        name: item.name,
+        qty: need > 0 ? need : null,
+        unit: item.unit,
+        source: "Запасы: пора докупить",
+      },
+    ]);
+    showToast(
+      added > 0 ? "Добавлено в список покупок" : "Уже в списке покупок",
+      added > 0 ? item.name : `«${item.name}» уже ждёт в списке`
     );
   };
 
@@ -177,88 +288,99 @@ export function InventoryClient({ items }: { items: StockItem[] }) {
           Под этот фильтр ничего не нашлось.
         </p>
       ) : (
-        <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {visible.map((item) => {
-            const max = MAX_BY_UNIT[item.unit] ?? 5;
-            const percent = Math.min(100, Math.round((item.stock / max) * 100));
-            const t = thresholdOf(percent);
+            const tone = toneOf(percentOf(item));
             const need = usage.get(item.name) ?? 0;
             const open = openName === item.name;
-            const badge =
-              item.stock === 0 ? "Нет в наличии" : percent < 20 ? "Мало" : null;
+            const days = 1 + (hashName(item.name) % 9);
             return (
               <li key={item.name}>
-                <button
-                  type="button"
-                  onClick={() => setOpenName(open ? null : item.name)}
-                  aria-expanded={open}
-                  title={
-                    need > 0
-                      ? `Использовано: ${formatQty(need)} ${item.unit} на 1 проект · Добавлено: ~${formatQty(need + item.stock)} ${item.unit}`
-                      : "Не используется в мастер-классах"
-                  }
-                  className={cn(
-                    "w-full rounded-xl bg-white p-4 text-left transition-shadow",
-                    percent < 20
-                      ? "shadow-lg ring-2 ring-red-300"
-                      : "shadow-card ring-1 ring-ink/5 hover:shadow-soft"
-                  )}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <h2 className="text-sm font-semibold leading-snug">
-                      {item.name}
-                    </h2>
-                    {badge && (
-                      <span className="shrink-0 rounded-full bg-red-100 px-2.5 py-1 text-[11px] font-bold text-red-700">
-                        {badge}
-                      </span>
-                    )}
-                  </div>
-                  <p className="mt-1 text-xs text-ink-soft">
-                    {formatQty(item.stock)} {item.unit} (
-                    {contextOf(item.stock, item.unit, need)})
-                  </p>
-                  <div className="mt-3 mb-1.5 flex items-center justify-between text-[11px] font-bold">
-                    <span className={t.labelClass}>{t.label}</span>
-                    <span className="text-ink-soft">{percent}%</span>
-                  </div>
-                  <ProgressBar value={item.stock} max={max} tone={t.tone} />
+                <div className="flex h-full flex-col overflow-hidden rounded-2xl bg-white shadow-card ring-1 ring-ink/5">
+                  <button
+                    type="button"
+                    onClick={() => setOpenName(open ? null : item.name)}
+                    aria-expanded={open}
+                    aria-label={`${item.name}: ${TONE_LABEL[tone]}. ${open ? "Свернуть" : "Развернуть"}`}
+                    className="block w-full text-left"
+                  >
+                    <MaterialSwatch
+                      name={item.name}
+                      className="aspect-[4/3] w-full"
+                    />
+                    <div className="p-3">
+                      <h2 className="line-clamp-2 min-h-10 text-sm font-bold leading-snug">
+                        {item.name}
+                      </h2>
+                      <div className="mt-2 flex items-center justify-between gap-1">
+                        <span
+                          className={cn(
+                            "flex items-center gap-1.5 text-[11px] font-bold",
+                            TONE_TEXT[tone]
+                          )}
+                        >
+                          <span
+                            aria-hidden
+                            className={cn(
+                              "h-2.5 w-2.5 shrink-0 rounded-full",
+                              TONE_DOT[tone]
+                            )}
+                          />
+                          {TONE_LABEL[tone]}
+                        </span>
+                        <ChevronDown
+                          aria-hidden
+                          className={cn(
+                            "h-4 w-4 shrink-0 text-ink-soft transition-transform",
+                            open && "rotate-180"
+                          )}
+                        />
+                      </div>
+                    </div>
+                  </button>
                   <div
                     className={cn(
                       "grid overflow-hidden transition-all duration-200",
                       open
-                        ? "mt-3 grid-rows-[1fr] opacity-100"
+                        ? "grid-rows-[1fr] opacity-100"
                         : "grid-rows-[0fr] opacity-0"
                     )}
                   >
-                    <dl className="min-h-0 space-y-1 rounded-lg bg-paper-deep/60 px-3 py-2 text-xs">
-                      <div className="flex justify-between gap-2">
-                        <dt className="text-ink-soft">Использовано:</dt>
-                        <dd className="font-semibold">
-                          {need > 0
-                            ? `${formatQty(need)} ${item.unit} на 1 проект`
-                            : "не нужно для мастер-классов"}
-                        </dd>
+                    <div className="min-h-0 border-t border-dashed border-ink/10 px-3 py-3">
+                      <p className="text-sm font-semibold">
+                        {item.stock === 0
+                          ? "Пусто — пора докупить"
+                          : `${formatQty(item.stock)} ${item.unit} — ${contextOf(item.stock, item.unit, need)}`}
+                      </p>
+                      <p className="mt-1 text-xs text-ink-soft">
+                        {need > 0
+                          ? `Использовано: ${formatQty(need)} ${item.unit} на 1 проект`
+                          : "Не нужно для мастер-классов"}
+                      </p>
+                      <p className="mt-0.5 text-xs text-ink-soft">
+                        Обновлено:{" "}
+                        {fresh.has(item.name) ? "только что" : updatedLabel(days)}
+                      </p>
+                      <div className="mt-3 grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => writeOff(item)}
+                          disabled={busyName === item.name}
+                          className="min-h-10 rounded-xl bg-white px-3 text-xs font-semibold text-ink ring-1 ring-ink/10 transition hover:bg-paper-deep active:scale-[0.98] disabled:opacity-50"
+                        >
+                          {busyName === item.name ? "Списываем…" : "Списать"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => buyOne(item)}
+                          className="min-h-10 rounded-xl bg-clay px-3 text-xs font-semibold text-paper shadow-card transition hover:bg-[#B06A48] active:scale-[0.98]"
+                        >
+                          Докупить
+                        </button>
                       </div>
-                      <div className="flex justify-between gap-2">
-                        <dt className="text-ink-soft">Добавлено:</dt>
-                        <dd className="font-semibold">
-                          ~{formatQty(need + item.stock)} {item.unit}
-                        </dd>
-                      </div>
-                    </dl>
+                    </div>
                   </div>
-                  <span className="mt-2 flex items-center gap-1 text-[11px] font-medium text-ink-soft">
-                    <ChevronDown
-                      aria-hidden
-                      className={cn(
-                        "h-3.5 w-3.5 transition-transform",
-                        open && "rotate-180"
-                      )}
-                    />
-                    {open ? "Скрыть историю" : "История расхода"}
-                  </span>
-                </button>
+                </div>
               </li>
             );
           })}
