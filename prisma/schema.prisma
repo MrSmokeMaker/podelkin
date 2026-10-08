@@ -1,0 +1,127 @@
+// Podelkin — схема PostgreSQL.
+// Заменяет собой in-memory массивы из src/lib/db.ts и src/lib/catalog-db.ts.
+// Прайс-бук и синонимы поиска НЕ в базе: это справочные данные, они живут
+// в коде (src/lib/db.ts) и синхронный collectCost не ломается.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Ручные поделки (сид из src/data/mockData, source = "manual")
+// и сгенерированные ИИ (source = "ai") — одна таблица.
+model Craft {
+  id               String   @id @default(cuid())
+  slug             String   @unique
+  title            String
+  description      String
+  category         String
+  difficulty       String
+  image            String?
+  materials        Json
+  tools            Json
+  steps            Json
+  safetyNotes      Json
+  tags             Json?
+  source           String   @default("manual") // manual | ai
+  estimatedTimeMin Int? // только для ИИ-поделок
+  imagePrompt      String?
+  imageSeed        Int?
+  assetId          String?
+  imageUrl         String?
+  createdAt        DateTime @default(now())
+
+  @@index([source])
+}
+
+model InventoryItem {
+  id    String @id @default(cuid())
+  name  String @unique
+  stock Float
+  unit  String
+}
+
+model Project {
+  id         String   @id @default(cuid())
+  craftSlug  String
+  craftTitle String
+  status     String // "в работе" | "готов"
+  startedAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  steps      Json // ProjectStep[]
+
+  @@index([craftSlug])
+}
+
+model Board {
+  id         String   @id @default(cuid())
+  title      String
+  craftSlugs Json // string[]
+  createdAt  DateTime @default(now())
+}
+
+// Кэш сгенерированных картинок: повторный промпт не тратит квоту.
+model ImageAsset {
+  id         String   @id @default(cuid())
+  promptHash String   @unique
+  prompt     String
+  provider   String
+  fileUrl    String?
+  seed       Int
+  width      Int      @default(1024)
+  height     Int      @default(1024)
+  steps      Int      @default(4)
+  hits       Int      @default(0)
+  createdAt  DateTime @default(now())
+}
+
+// Черновик ИИ-генерации до одобрения (approve) → Craft.
+model AiDraft {
+  id              String   @id @default(cuid())
+  topic           String
+  normalizedTopic String
+  payload         Json
+  valid           Boolean
+  status          String   @default("draft") // draft | approved | rejected
+  createdAt       DateTime @default(now())
+  craftId         String?
+
+  @@index([normalizedTopic, valid, createdAt])
+}
+
+// Дневной лимит генераций на пользователя (GEN_PER_USER_PER_DAY).
+model GenerationCounter {
+  userId String
+  day    String
+  count  Int    @default(0)
+
+  @@id([userId, day])
+}
+
+// Счётчики для /api/stats/ai: llmCalls, imageRenders, cacheHits, cacheMisses.
+model AiStats {
+  key   String @id
+  value Int    @default(0)
+}
+
+// Раздел «Поделки»: импорт с only-paper.ru и 1001zagotovka.ru.
+model CatalogItem {
+  id           String   @id @default(cuid())
+  title        String
+  category     String
+  sourceUrl    String   @unique
+  sourceName   String
+  description  String
+  difficulty   String
+  materials    Json // string[]
+  instructions Json? // string[] | null
+  assemblyTime String
+  thumbnail    String?
+  templateUrl  String?
+  tags         Json // string[]
+  createdAt    DateTime @default(now())
+}

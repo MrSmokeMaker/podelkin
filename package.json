@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "prisma": {
+    "seed": "bun prisma/seed.ts"
+  },
   "scripts": {
     "start": "next start",
     "format": "bunx prettier --write . --ignore-unknown",

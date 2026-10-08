@@ -17,9 +17,10 @@
   самописных: меньше багов в a11y и мобильных жестах.
 - **Слой данных в памяти (`src/lib/db.ts`)** — fallback вместо PostgreSQL +
   Prisma (в среде нет сети для установки пакетов): тот же контракт моделей
-  (Craft, PriceBookItem, InventoryItem, Project, Board, Synonym), замена на
-  Prisma — переписать один файл (см. «Миграция на PostgreSQL»). Каталог
-  «Поделок» — соседний `src/lib/catalog-db.ts`, тоже в памяти.
+  (Craft, PriceBookItem, InventoryItem, Project, Board, Synonym). Готовые
+  Prisma-шаблоны лежат в `prisma/` — переход по инструкции из раздела
+  «Миграция на PostgreSQL». Каталог «Поделок» — соседний
+  `src/lib/catalog-db.ts`, тоже в памяти.
 - **PWA (manifest + service worker)** — установка на телефон и офлайн-доступ
   к посещённым страницам; для Premium — предкэш топ-50 поделок.
 
@@ -32,7 +33,8 @@
    умолчанию уже рабочие).
 3. Миграции и сид не нужны: слой данных в памяти сидируется при старте
    (15 поделок, 41 позиция прайс-бука, 40 запасов, 3 проекта, 5 досок,
-   6 синонимов).
+   6 синонимов). Для перехода на PostgreSQL — шаблоны в `prisma/`
+   (инструкция ниже).
 4. `bun run dev` — фронтенд + API на `http://localhost:3000`.
 5. Продакшен: `bun run build && bun run start`.
 6. Проверка перед релизом: `bun run release:check`.
@@ -206,7 +208,8 @@ A/B-тесты цены и paywall'а (события `upgrade_click`, `plan_vie
   ценами должны быть в прайс-буке, иначе `baseCost` честно покажет
   `missingPrices`).
 - **Новая поделка в «Поделках»** — запись в `src/lib/catalog-db.ts` или импорт
-  по ссылке со страницы «Генерация» (см. раздел выше).
+  по ссылке со страницы «Генерация» (см. раздел выше); после перехода на
+  PostgreSQL стартовые записи правятся в `prisma/seed.ts`.
 - **Расширение stats API** — premium-поля в ветку `advancedStats`
   (`src/app/api/stats/route.ts`), тип `PremiumStats` в
   `stats-advanced.tsx` дополнить теми же полями.
@@ -228,9 +231,55 @@ MIT — см. текст лицензии в выпуске. Все данные
   пересоздаётся при старте модуля. Скачанные фото импорта остаются на диске
   (`uploads/crafts`), а ссылки на них — в памяти: после перезапуска записи
   «Поделок» пропадают, файлы можно подчистить.
-- Для переноса: заменить функции `src/lib/db.ts` на Prisma-запросы (схема
-  моделей совпадает), поднять базу
-  (`docker run -e POSTGRES_PASSWORD=rukodelie -p 5432:5432 postgres:16`),
-  задать `DATABASE_URL`, выполнить `npx prisma migrate dev && npx prisma db
-  seed`. Поисковый конвейер заменяется на `ts_rank` + `similarity()` —
-  контракт `/api/crafts` сохранится.
+- В среде разработки нет сети для установки пакетов, поэтому in-memory остаётся
+  режимом по умолчанию; **готовые заготовки для перехода лежат в `prisma/`**
+  (папка исключена из tsconfig — сборка её не трогает).
+
+### Переход на PostgreSQL + Prisma (шаблоны готовы)
+
+Файлы из `prisma/` рассчитаны на копирование поверх проекта:
+
+| Файл-шаблон | Куда скопировать | Что внутри |
+|---|---|---|
+| `schema.prisma` | `prisma/schema.prisma` | 9 моделей: Craft, InventoryItem, Project, Board, ImageAsset, AiDraft, GenerationCounter, AiStats, CatalogItem |
+| `db.postgres.ts` | `src/lib/db.ts` | типы + прайс-бук и синонимы (клиентобезопасно, без Prisma) |
+| `db-server.postgres.ts` | `src/lib/db-server.ts` | Prisma-функции вместо in-memory массивов |
+| `catalog-db.postgres.ts` | `src/lib/catalog-db.ts` | константы категорий/источников (клиентобезопасно) |
+| `catalog-db-server.postgres.ts` | `src/lib/catalog-db-server.ts` | Prisma-функции «Поделок» |
+| `seed.ts` | `prisma/seed.ts` | сид: поделки, запасы, доски, проекты, «Поделки» |
+
+Шаги на машине с сетью:
+
+1. Пакеты и база: `bun add @prisma/client && bun add -d prisma`,
+   `docker run -e POSTGRES_PASSWORD=rukodelie -p 5432:5432 postgres:16`.
+2. `bunx prisma init`, затем заменить созданный `prisma/schema.prisma`
+   шаблоном; в `.env` прописать
+   `DATABASE_URL=postgresql://postgres:rukodelie@localhost:5432/postgres`.
+3. `bunx prisma migrate dev --name init` → `bunx prisma db seed`.
+4. Скопировать шаблоны по таблице выше (старый `db.ts` при желании сохранить
+   как `db.inmemory.ts`).
+5. В серверных маршрутах заменить импорты: функции — из `@/lib/db-server` и
+   `@/lib/catalog-db-server`, типы и справочники остаются в `@/lib/db` /
+   `@/lib/catalog-db`. Соответствие старого и нового:
+
+   | Было (массив из db.ts) | Стало (функция db-server) |
+   |---|---|
+   | `crafts` / `aiCrafts` | `await listCrafts()` / `await listAiCrafts()` |
+   | `inventory` | `await listInventory()` |
+   | `boards` (+ `boards.push(...)`) | `await listBoards()` / `await createBoard(...)` |
+   | `projects` (мутации `p.steps[i].done = true`) | `await listProjects()` + `await saveProject(p)` |
+   | `imageAssets` | `imageAssetStore.*` (API прежний) |
+   | `aiStats.llmCalls++` | `await bumpAiStat("llmCalls")` |
+   | `catalogItems` | `await listCatalogItems()` |
+
+   Имена функций (`createProject`, `upsertInventoryItem`, `findAiCraft`,
+   `createCatalogItem`…) не менялись — только дописать `await`; TypeScript
+   подсветит каждую точку, где await пропущен.
+6. Убрать `"prisma"` из `exclude` в `tsconfig.json`, прогнать `bun run build`.
+
+Прайс-бук и синонимы поиска в базу не переезжают — это справочные данные,
+поэтому `collectCost` остаётся синхронным. Поисковый конвейер `/api/crafts`
+на старте можно оставить как есть (фильтр по массиву из `listCrafts()`);
+SQL-вариант `ts_rank` + `similarity()` (расширение `pg_trgm`) — когда поделок
+станут десятки тысяч. Деплой: `prisma migrate deploy` при выкладке,
+бэкап — `pg_dump`.
