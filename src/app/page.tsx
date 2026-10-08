@@ -41,8 +41,8 @@ export default function HomePage() {
         </div>
         <div className="relative min-h-56 sm:min-h-72 lg:min-h-0">
           <img
-            src="/hero-workshop.webp"
-            alt="Иллюстрация: стол рукодельца с бумажными моделями, пряжей и кистями"
+            src="/hero-lineart.webp"
+            alt="Иллюстрация в стиле лайн-арт: ножницы, клубок пряжи и игла на бежевом фоне"
             className="absolute inset-0 h-full w-full object-cover"
           />
         </div>
