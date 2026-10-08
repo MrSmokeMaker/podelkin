@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import { BoardsClient } from "./_components/boards-client";
 
 export const metadata: Metadata = {
-  title: "Доски",
+  title: "Коллекции",
   description:
-    "Доски настроения с подборками поделок. Бесплатно — до 3 досок, Premium — до 20.",
+    "Коллекции идей — подборки поделок под цель. Бесплатно — до 3 коллекций, Premium — до 20.",
 };
 
 export default function BoardsPage() {

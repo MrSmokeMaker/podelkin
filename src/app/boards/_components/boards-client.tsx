@@ -47,11 +47,11 @@ export function BoardsClient() {
       });
       const data = await res.json();
       if (!res.ok) {
-        showToast("Лимит досок", data.error ?? "Не удалось создать доску");
+        showToast("Лимит коллекций", data.error ?? "Не удалось создать коллекцию");
         return;
       }
       setTitle("");
-      showToast("Доска создана", `«${data.board.title}»`);
+      showToast("Коллекция создана", `«${data.board.title}»`);
       load();
     } catch {
       showToast("Ошибка сети", "Проверьте соединение и попробуйте снова");
@@ -62,11 +62,11 @@ export function BoardsClient() {
     <div className="space-y-6">
       <header>
         <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
-          Доски настроения
+          Коллекции идей
         </h1>
         <p className="mt-1 text-sm text-ink-soft">
           Подборки поделок под цель: кухня, подарки, детская. Лимит тарифа —{" "}
-          {boardLimit} досок
+          {boardLimit} коллекций
         </p>
       </header>
 
@@ -74,10 +74,10 @@ export function BoardsClient() {
         <div className="flex flex-wrap items-center gap-3 rounded-2xl bg-sand-soft p-4 text-sm font-medium text-[#8A6A2F]">
           <Lock className="h-5 w-5 shrink-0" aria-hidden />
           <p className="min-w-0 flex-1">
-            На бесплатном тарифе — до {boardLimit} досок. Оформите Premium,
-            чтобы вести до 20 досок.
+            На бесплатном тарифе — до {boardLimit} коллекций. Оформите Premium,
+            чтобы вести до 20.
           </p>
-          <PremiumBadge tooltip="Premium: до 20 досок и неограниченные проекты" />
+          <PremiumBadge tooltip="Premium: до 20 коллекций и неограниченные проекты" />
         </div>
       )}
 
@@ -91,10 +91,10 @@ export function BoardsClient() {
         <input
           value={title}
           onChange={(event) => setTitle(event.target.value)}
-          placeholder="Новая доска: например «Подарки на Новый год»"
+          placeholder="Новая коллекция: например «Подарки на Новый год»"
           maxLength={60}
           disabled={atLimit}
-          aria-label="Название новой доски"
+          aria-label="Название новой коллекции"
           className="min-h-12 flex-1 rounded-xl border border-ink/10 bg-white px-4 text-sm outline-none transition focus:border-clay disabled:cursor-not-allowed disabled:opacity-60"
         />
         <button
@@ -103,7 +103,7 @@ export function BoardsClient() {
           className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-clay px-5 py-3 text-sm font-semibold text-paper shadow-card transition hover:bg-[#B06A48] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Plus className="h-4 w-4" aria-hidden />
-          Создать доску
+          Создать коллекцию
         </button>
       </form>
 
@@ -129,10 +129,10 @@ export function BoardsClient() {
                           {board.craftTitles.length} поделок
                         </p>
                       </div>
-                      <PremiumBadge tooltip="Эта доска откроется на тарифе Premium (до 20 досок)" />
+                      <PremiumBadge tooltip="Эта коллекция откроется на тарифе Premium (до 20 коллекций)" />
                     </div>
                     <p className="mt-3 text-sm font-medium text-[#9C5570]">
-                      Оформите Premium, чтобы открыть доску
+                      Оформите Premium, чтобы открыть коллекцию
                     </p>
                   </div>
                 ) : (
