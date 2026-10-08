@@ -1,4 +1,4 @@
-const CACHE = "rukodelie-v10";
+const CACHE = "rukodelie-v11";
 const CORE = [
   "/",
   "/catalog",
@@ -21,9 +21,14 @@ const MAX_CACHE_BYTES = 4 * 1024 * 1024;
 /* globPatterns (аналог VitePWA): статика, которую отдём stale-while-revalidate */
 const STATIC_PATTERN = /\.(js|css|svg|png|jpg|jpeg|webp|woff2)$/;
 
+/* Каждый адрес кэшируется независимо: сбой одного файла (сеть, хранилище)
+   не должен ронять установку воркера целиком. */
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE).then((cache) => cache.addAll(CORE)).then(() => self.skipWaiting())
+    caches
+      .open(CACHE)
+      .then((cache) => Promise.allSettled(CORE.map((url) => cache.add(url))))
+      .then(() => self.skipWaiting())
   );
 });
 
@@ -31,8 +36,15 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+      .then((keys) =>
+        Promise.allSettled(
+          keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))
+        )
+      )
       .then(() => self.clients.claim())
+      .catch(() => {
+        /* старые кэши не критичны — пропускаем */
+      })
   );
 });
 

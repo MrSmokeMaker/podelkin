@@ -7,31 +7,31 @@ import { useEffect } from "react";
    Приложение не может на это повлиять, поэтому гасим только эту ошибку;
    все остальные по-прежнему всплывают. */
 function isEnvironmentNoise(reason: unknown): boolean {
-  return reason instanceof DOMException && reason.name === "InvalidStateError";
+  if (!(reason instanceof DOMException)) return false;
+  return (
+    reason.name === "InvalidStateError" ||
+    reason.message === "The object is in an invalid state."
+  );
+}
+
+/* Слушатели вешаются на уровне модуля — до первого рендера React,
+   чтобы перехватить ошибку, возникающую в самый ранний момент загрузки. */
+if (typeof window !== "undefined") {
+  window.addEventListener("unhandledrejection", (event) => {
+    if (isEnvironmentNoise(event.reason)) {
+      event.preventDefault();
+      console.debug("Podelkin: браузер отклонил фоновую операцию —", event.reason.message);
+    }
+  });
+  window.addEventListener("error", (event) => {
+    if (isEnvironmentNoise(event.error)) {
+      event.preventDefault();
+      console.debug("Podelkin: браузер отклонил фоновую операцию —", event.error.message);
+    }
+  });
 }
 
 export function PwaRegister() {
-  useEffect(() => {
-    const onRejection = (event: PromiseRejectionEvent) => {
-      if (isEnvironmentNoise(event.reason)) {
-        event.preventDefault();
-        console.debug("Podelkin: браузер отклонил фоновую операцию —", event.reason.message);
-      }
-    };
-    const onError = (event: ErrorEvent) => {
-      if (isEnvironmentNoise(event.error)) {
-        event.preventDefault();
-        console.debug("Podelkin: браузер отклонил фоновую операцию —", event.error.message);
-      }
-    };
-    window.addEventListener("unhandledrejection", onRejection);
-    window.addEventListener("error", onError);
-    return () => {
-      window.removeEventListener("unhandledrejection", onRejection);
-      window.removeEventListener("error", onError);
-    };
-  }, []);
-
   useEffect(() => {
     if (!("serviceWorker" in navigator)) return;
 
