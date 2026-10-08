@@ -1,18 +1,56 @@
 {
-  "name": "Podelkin — мастер-классы по шагам",
+  "name": "Podelkin — идеи и учёт материалов для рукоделия",
   "short_name": "Podelkin",
-  "description": "Пошаговые мастер-классы: керамика, дерево, пряжа, свечи. Списки покупок и запасы.",
+  "description": "Приложение для любителей рукоделия: идеи поделок из остатков, пошаговый мастер-класс, учёт материалов и автоматическое списание.",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#F7F2EA",
-  "theme_color": "#C9825E",
+  "orientation": "portrait",
+  "theme_color": "#C98A6A",
+  "background_color": "#FDFBF7",
   "lang": "ru",
+  "categories": ["education", "lifestyle"],
   "icons": [
     {
-      "src": "/icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
       "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshots/ss-home.png",
+      "sizes": "1080x1920",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Главный экран: идеи поделок и мастер-классы"
+    },
+    {
+      "src": "/screenshots/ss-inventory.png",
+      "sizes": "1080x1920",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Учёт материалов и запасов мастерской"
+    },
+    {
+      "src": "/screenshots/ss-project.png",
+      "sizes": "1080x1920",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Проект в работе: пошаговый мастер-класс"
     }
   ],
   "shortcuts": [
