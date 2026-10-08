@@ -77,11 +77,11 @@ export function DetailClient({ item }: { item: CatalogItem }) {
   return (
     <div className="space-y-5">
       <Link
-        href="/podelki"
+        href="/"
         className="inline-flex items-center gap-1.5 text-sm text-ink-soft transition-colors hover:text-ink"
       >
         <ArrowLeft aria-hidden className="h-4 w-4" />
-        Каталог поделок
+        На главную
       </Link>
 
       <div className="grid gap-6 lg:grid-cols-2">

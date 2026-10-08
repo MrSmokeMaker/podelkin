@@ -1,8 +1,8 @@
-const CACHE = "rukodelie-v7";
+const CACHE = "rukodelie-v8";
 const CORE = [
   "/",
   "/catalog",
-  "/podelki",
+  "/generate",
   "/podelki/favorites",
   "/inventory",
   "/shopping-list",

@@ -1,13 +1,12 @@
 "use client";
 
 import { useRef, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ImagePlus, Loader2, X } from "lucide-react";
+import { ImagePlus, Loader2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/toast";
 import { addShoppingItems } from "@/lib/shopping-list";
-import { DIFFICULTY_STYLES } from "../../_components/catalog-visuals";
+import { DIFFICULTY_STYLES } from "./catalog-visuals";
 
 const CATEGORIES = [
   "бумажная модель",
@@ -164,14 +163,6 @@ export function NewPodelkaClient() {
 
   return (
     <div className="space-y-5">
-      <Link
-        href="/podelki"
-        className="inline-flex items-center gap-1.5 text-sm text-ink-soft transition-colors hover:text-ink"
-      >
-        <ArrowLeft aria-hidden className="h-4 w-4" />
-        Каталог поделок
-      </Link>
-
       <div>
         <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
           Добавить поделку
@@ -408,12 +399,6 @@ export function NewPodelkaClient() {
             {submitting && <Loader2 aria-hidden className="h-4 w-4 animate-spin" />}
             {submitting ? "Сохраняем…" : "Сохранить поделку"}
           </button>
-          <Link
-            href="/podelki"
-            className="text-sm font-medium text-ink-soft transition-colors hover:text-ink"
-          >
-            Отмена
-          </Link>
         </div>
       </form>
     </div>

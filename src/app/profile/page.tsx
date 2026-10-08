@@ -25,7 +25,7 @@ export const metadata: Metadata = {
 /* «Действия» — три главных сценария из брифа, больше ничего лишнего. */
 const actions = [
   { href: "/catalog", label: "Найти идею", icon: Lightbulb },
-  { href: "/podelki/new", label: "Записать поделку", icon: PenLine },
+  { href: "/generate?tab=manual", label: "Записать поделку", icon: PenLine },
   { href: "/inventory", label: "Проверить запасы", icon: Boxes },
 ];
 

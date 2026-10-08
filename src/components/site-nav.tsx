@@ -10,7 +10,6 @@ import {
   LogIn,
   Plus,
   Scissors,
-  Shapes,
   ShoppingCart,
   Sparkles,
   UserRound,
@@ -30,8 +29,8 @@ const links = [
 
 const mobileLinks = [
   { href: "/catalog", label: "Каталог", icon: LayoutGrid },
-  { href: "/podelki", label: "Поделки", icon: Shapes },
   { href: "/inventory", label: "Запасы", icon: Boxes },
+  { href: "/shopping-list", label: "Покупки", icon: ShoppingCart },
   { href: "/profile", label: "Профиль", icon: UserRound },
 ];
 
@@ -173,7 +172,7 @@ export function BottomNav() {
       className="fixed inset-x-0 bottom-0 z-40 border-t border-ink/10 bg-paper/95 pb-[env(safe-area-inset-bottom)] shadow-soft backdrop-blur md:hidden"
     >
       <div className="grid grid-cols-5">
-        {mobileLinks.slice(0, 2).map(renderLink)}
+        {mobileLinks.slice(0, 1).map(renderLink)}
         <Link
           href="/generate"
           aria-label="Сгенерировать поделку"

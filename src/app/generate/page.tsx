@@ -1,25 +1,23 @@
 import type { Metadata } from "next";
-import { GenerateCraft } from "./_components/generate-craft";
+import { InstallBanner } from "../podelki/_components/install-banner";
+import { GenerateTabs } from "./_components/generate-tabs";
 
 export const metadata: Metadata = {
-  title: "AI-генерация",
+  title: "Создать поделку",
   description:
-    "Опишите тему — Groq подготовит черновик мастер-класса: шаги, материалы и безопасность. Поделка создаётся только после вашего одобрения.",
+    "Два способа: опишите тему — ИИ подготовит черновик мастер-класса, или добавьте поделку вручную по ссылке на источник.",
 };
 
-export default function GeneratePage() {
+interface Props {
+  searchParams: Promise<{ tab?: string }>;
+}
+
+export default async function GeneratePage({ searchParams }: Props) {
+  const { tab } = await searchParams;
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
-          AI-генерация мастер-класса
-        </h1>
-        <p className="mt-1 max-w-2xl text-sm text-ink-soft">
-          Придумайте тему — модель предложит черновик. Он превратится в поделку
-          с картинкой только после вашего одобрения.
-        </p>
-      </header>
-      <GenerateCraft />
+      <GenerateTabs initialTab={tab === "manual" ? "manual" : "ai"} />
+      <InstallBanner />
     </div>
   );
 }
