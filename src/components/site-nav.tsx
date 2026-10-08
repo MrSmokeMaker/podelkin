@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -10,12 +9,12 @@ import {
   LogIn,
   Plus,
   Scissors,
+  Settings,
   ShoppingCart,
   Sparkles,
   UserRound,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { subscribeShoppingList } from "@/lib/shopping-list";
 import { useSession } from "@/components/session-provider";
 
 /* Экспорт и статистика переехали в Профиль → «Настройки» (по брифу). */
@@ -24,6 +23,7 @@ const links = [
   { href: "/generate", label: "AI", icon: Sparkles },
   { href: "/inventory", label: "Запасы", icon: Boxes },
   { href: "/boards", label: "Папки", icon: Layers },
+  { href: "/settings", label: "Настройки", icon: Settings },
   { href: "/profile", label: "Профиль", icon: UserRound },
 ];
 
@@ -31,6 +31,7 @@ const mobileLinks = [
   { href: "/catalog", label: "Каталог", icon: LayoutGrid },
   { href: "/inventory", label: "Запасы", icon: Boxes },
   { href: "/shopping-list", label: "Покупки", icon: ShoppingCart },
+  { href: "/settings", label: "Настройки", icon: Settings },
   { href: "/profile", label: "Профиль", icon: UserRound },
 ];
 
@@ -40,18 +41,7 @@ function isActive(pathname: string, href: string) {
 
 export function SiteHeader() {
   const pathname = usePathname();
-  const [shoppingCount, setShoppingCount] = useState(0);
   const { user } = useSession();
-
-  useEffect(
-    () =>
-      subscribeShoppingList((items) =>
-        setShoppingCount(items.filter((item) => !item.bought).length)
-      ),
-    []
-  );
-
-  const shoppingActive = pathname.startsWith("/shopping-list");
 
   return (
     <header className="sticky top-0 z-40 border-b border-ink/10 bg-paper/90 backdrop-blur">
@@ -86,27 +76,6 @@ export function SiteHeader() {
               );
             })}
           </nav>
-          <Link
-            href="/shopping-list"
-            aria-current={shoppingActive ? "page" : undefined}
-            className={cn(
-              "flex items-center gap-1.5 rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors",
-              shoppingActive
-                ? "bg-clay-soft text-[#8A4A2C]"
-                : "text-ink-soft hover:bg-clay-soft/60 hover:text-ink"
-            )}
-          >
-            <ShoppingCart className="h-5 w-5" />
-            Покупки
-            {shoppingCount > 0 && (
-              <span
-                aria-label={`${shoppingCount} позиций к покупке`}
-                className="flex h-5 min-w-5 items-center justify-center rounded-full bg-clay px-1.5 text-[11px] font-bold text-paper"
-              >
-                {shoppingCount}
-              </span>
-            )}
-          </Link>
           {user ? (
             <Link
               href="/profile"
@@ -171,7 +140,7 @@ export function BottomNav() {
       aria-label="Основная (мобильная)"
       className="fixed inset-x-0 bottom-0 z-40 border-t border-ink/10 bg-paper/95 pb-[env(safe-area-inset-bottom)] shadow-soft backdrop-blur md:hidden"
     >
-      <div className="grid grid-cols-5">
+      <div className="grid grid-cols-6">
         {mobileLinks.slice(0, 1).map(renderLink)}
         <Link
           href="/generate"

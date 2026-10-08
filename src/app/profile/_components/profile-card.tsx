@@ -3,18 +3,58 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Check, CreditCard, Heart, LogOut, Pencil, X } from "lucide-react";
+import { CreditCard, Heart, LogOut, Pencil } from "lucide-react";
 import { useSession } from "@/components/session-provider";
 import { useToast } from "@/components/toast";
 import { useFeatureFlags } from "@/hooks/use-feature-flags";
-import { PLAN_LABELS, PLAN_PRICES, formatLimit } from "@/lib/feature-flags";
+import {
+  BOARD_LIMITS,
+  GENERATION_LIMITS,
+  PLAN_LABELS,
+  PLAN_PRICES,
+  PROJECT_LIMITS,
+  ROLES,
+  formatLimit,
+  type Role,
+} from "@/lib/feature-flags";
 import { readFavoriteIds } from "@/lib/favorites";
+import { cn } from "@/lib/utils";
 
-/* Три пункта из брифа — ровно то, что обещаем в модалке. */
-const PREMIUM_PERKS = [
-  "Генерация с ИИ — 15 в день вместо 3",
-  "10 проектов и 20 коллекций одновременно",
-  "Расширенная аналитика и экспорт .csv",
+/* Сравнение тарифов: цифры берём из feature-flags, чтобы таблица
+   не разошлась с реальными лимитами. Последние две строки — текстом. */
+const TABLE_ROWS: { label: string; values: Record<Role, string> }[] = [
+  {
+    label: "ИИ-генераций в день",
+    values: {
+      basic: String(GENERATION_LIMITS.basic),
+      premium: String(GENERATION_LIMITS.premium),
+      director: String(GENERATION_LIMITS.director),
+    },
+  },
+  {
+    label: "Проекты",
+    values: {
+      basic: formatLimit(PROJECT_LIMITS.basic),
+      premium: formatLimit(PROJECT_LIMITS.premium),
+      director: formatLimit(PROJECT_LIMITS.director),
+    },
+  },
+  {
+    label: "Коллекции",
+    values: {
+      basic: formatLimit(BOARD_LIMITS.basic),
+      premium: formatLimit(BOARD_LIMITS.premium),
+      director: formatLimit(BOARD_LIMITS.director),
+    },
+  },
+  {
+    label: "Экспорт",
+    values: { basic: "TXT", premium: "+ CSV", director: "+ JSON" },
+  },
+  {
+    label: "Аналитика",
+    values: { basic: "Базовая", premium: "Расширенная", director: "ИИ-метрики" },
+  },
 ];
 
 const NAME_STORAGE_KEY = "rukodelie-profile-name";
@@ -23,11 +63,10 @@ export function ProfileCard() {
   const router = useRouter();
   const showToast = useToast();
   const { user, refresh } = useSession();
-  const { role, boardLimit } = useFeatureFlags();
+  const { role } = useFeatureFlags();
   const [name, setName] = useState("Гость мастерской");
   const [favorites, setFavorites] = useState(0);
   const [editing, setEditing] = useState(false);
-  const [showPerks, setShowPerks] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
 
   useEffect(() => {
@@ -102,7 +141,7 @@ export function ProfileCard() {
                 aria-label="Сохранить имя"
                 className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-sage-soft text-[#55693F] transition active:scale-95"
               >
-                <Check className="h-4 w-4" aria-hidden />
+                <Pencil className="h-4 w-4" aria-hidden />
               </button>
             </div>
           ) : (
@@ -126,20 +165,80 @@ export function ProfileCard() {
         </div>
       </div>
 
-      <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold">
-        <span className="inline-flex min-h-8 items-center rounded-full bg-clay-soft px-3 py-1.5 text-[#8A4A2C]">
-          Твой тариф: {PLAN_LABELS[role]}
-        </span>
-        <span className="inline-flex min-h-8 items-center gap-1.5 rounded-full bg-paper-deep/70 px-3 py-1.5">
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <span className="inline-flex min-h-8 items-center gap-1.5 rounded-full bg-paper-deep/70 px-3 py-1.5 text-xs font-semibold">
           <Heart className="h-3.5 w-3.5 text-blush" aria-hidden />
           {favorites} в избранном
         </span>
-        <span className="inline-flex min-h-8 items-center rounded-full bg-paper-deep/70 px-3 py-1.5">
-          Коллекций: до {formatLimit(boardLimit)}
-        </span>
       </div>
 
-      <div className="mt-5 flex flex-col gap-3 border-t border-ink/10 pt-4 sm:flex-row">
+      <div className="mt-4 overflow-hidden rounded-xl ring-1 ring-ink/10">
+        <div
+          aria-label="Сравнение тарифов"
+          className="grid grid-cols-[1.15fr_repeat(3,1fr)] text-xs"
+        >
+          <div aria-hidden className="bg-paper-deep/50" />
+          {ROLES.map((r) => {
+            const current = r === role;
+            const cell = (
+              <>
+                <span className="block text-[11px] font-bold leading-tight">
+                  {PLAN_LABELS[r]}
+                </span>
+                <span
+                  className={cn(
+                    "block text-[10px] font-medium leading-tight",
+                    current ? "text-paper/80" : "text-ink-soft"
+                  )}
+                >
+                  {PLAN_PRICES[r] === 0 ? "0 ₽" : `${PLAN_PRICES[r]} ₽`}
+                </span>
+                {current && <span className="sr-only"> — ваш текущий тариф</span>}
+              </>
+            );
+            return current ? (
+              <div
+                key={r}
+                className="bg-clay px-1 py-2 text-center text-paper shadow-card"
+              >
+                {cell}
+              </div>
+            ) : (
+              <Link
+                key={r}
+                href="/billing"
+                className="bg-paper-deep/50 px-1 py-2 text-center text-ink transition-colors hover:bg-clay-soft/60"
+              >
+                {cell}
+              </Link>
+            );
+          })}
+          {TABLE_ROWS.map(({ label, values }) => (
+            <div key={label} className="contents">
+              <div className="border-t border-ink/5 px-2.5 py-2 text-[11px] font-medium leading-tight text-ink-soft">
+                {label}
+              </div>
+              {ROLES.map((r) => (
+                <div
+                  key={r}
+                  className={cn(
+                    "border-t border-ink/5 px-1 py-2 text-center text-[11px] font-semibold leading-tight",
+                    r === role && "bg-clay-soft/50 text-[#8A4A2C]"
+                  )}
+                >
+                  {values[r]}
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+      <p className="mt-2 text-[11px] leading-snug text-ink-soft">
+        Текущий тариф подсвечен. Нажмите на другой столбец, чтобы сравнить и
+        сменить тариф.
+      </p>
+
+      <div className="mt-4 flex flex-col gap-3 border-t border-ink/10 pt-4 sm:flex-row">
         {user ? (
           <>
             <Link
@@ -147,7 +246,7 @@ export function ProfileCard() {
               className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-clay px-5 py-3 text-sm font-semibold text-paper shadow-card transition hover:bg-[#B06A48] active:scale-[0.98]"
             >
               <CreditCard className="h-4 w-4" aria-hidden />
-              Управлять тарифом
+              Сменить тариф
             </Link>
             <button
               type="button"
@@ -176,70 +275,6 @@ export function ProfileCard() {
           </>
         )}
       </div>
-
-      {!user && (
-        <div className="mt-4 flex flex-col gap-3 border-t border-ink/10 pt-4 sm:flex-row">
-          <button
-            type="button"
-            onClick={() => setShowPerks(true)}
-            className="flex min-h-12 flex-1 items-center justify-center rounded-xl border-2 border-clay bg-white px-5 py-3 text-sm font-semibold text-[#8A4A2C] transition hover:bg-clay-soft/40 active:scale-[0.98]"
-          >
-            Что я получу в Премиуме?
-          </button>
-          <Link
-            href="/billing"
-            className="flex min-h-12 flex-1 items-center justify-center rounded-xl bg-white px-5 py-3 text-sm font-semibold text-ink ring-1 ring-ink/10 transition hover:bg-paper-deep active:scale-[0.98]"
-          >
-            Смотреть тарифы — от {PLAN_PRICES.premium} ₽/мес
-          </Link>
-        </div>
-      )}
-
-      {showPerks && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label="Что даёт Премиум"
-          className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-4 sm:items-center"
-          onClick={() => setShowPerks(false)}
-        >
-          <div
-            className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-soft"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-start justify-between gap-3">
-              <h3 className="text-lg font-bold">Что даёт Премиум</h3>
-              <button
-                type="button"
-                onClick={() => setShowPerks(false)}
-                aria-label="Закрыть"
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-ink-soft transition-colors hover:bg-paper-deep hover:text-ink active:scale-95"
-              >
-                <X className="h-4 w-4" aria-hidden />
-              </button>
-            </div>
-            <ul className="mt-4 space-y-3">
-              {PREMIUM_PERKS.map((perk) => (
-                <li
-                  key={perk}
-                  className="flex items-start gap-2.5 text-sm font-medium"
-                >
-                  <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-sage-soft text-[#55693F]">
-                    <Check className="h-3.5 w-3.5" strokeWidth={3} aria-hidden />
-                  </span>
-                  {perk}
-                </li>
-              ))}
-            </ul>
-            <Link
-              href="/billing"
-              className="mt-5 flex min-h-11 w-full items-center justify-center rounded-xl bg-clay px-5 py-2.5 text-sm font-semibold text-paper shadow-card transition hover:bg-[#B06A48] active:scale-[0.98]"
-            >
-              Смотреть тарифы
-            </Link>
-          </div>
-        </div>
-      )}
     </section>
   );
 }

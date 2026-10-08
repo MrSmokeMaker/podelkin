@@ -1,4 +1,4 @@
-const CACHE = "rukodelie-v8";
+const CACHE = "rukodelie-v9";
 const CORE = [
   "/",
   "/catalog",
@@ -7,6 +7,7 @@ const CORE = [
   "/inventory",
   "/shopping-list",
   "/boards",
+  "/settings",
   "/export",
   "/stats",
   "/manifest.json",
