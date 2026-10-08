@@ -61,7 +61,7 @@ function htmlToText(html: string): string {
     .trim();
 }
 
-function decodeEntities(text: string): string {
+export function decodeEntities(text: string): string {
   const named: Record<string, string> = {
     amp: "&",
     lt: "<",

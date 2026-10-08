@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   CheckCircle2,
   Clock,
@@ -8,6 +8,7 @@ import {
   Link2,
   ListChecks,
   Loader2,
+  Search,
   Sparkles,
   TriangleAlert,
   Wrench,
@@ -45,6 +46,13 @@ interface ApproveResult {
 }
 
 type Phase = "form" | "generating" | "draft" | "approving" | "done";
+
+interface SourceSuggestion {
+  url: string;
+  title: string;
+  site: string;
+  siteLabel: string;
+}
 
 const SUGGESTIONS = [
   "подсвечник из банки и джута",
@@ -176,12 +184,66 @@ export function GenerateCraft() {
   const [result, setResult] = useState<ApproveResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [remainingQuota, setRemainingQuota] = useState<number | null>(null);
+  const [suggestions, setSuggestions] = useState<SourceSuggestion[]>([]);
+  const [suggestOpen, setSuggestOpen] = useState(false);
+  const [suggestLoading, setSuggestLoading] = useState(false);
+  const [failedSites, setFailedSites] = useState<string[]>([]);
+  const [activeSuggest, setActiveSuggest] = useState(-1);
+  const searchSeq = useRef(0);
 
   const trimmed = topic.trim();
   const topicValid = trimmed.length >= 3 && trimmed.length <= 120;
   const urlTrimmed = sourceUrl.trim();
   const urlValid = /^https?:\/\/\S{4,}/i.test(urlTrimmed);
   const busy = phase === "generating" || phase === "approving";
+  const queryLike = urlTrimmed.length >= 3 && !/^https?:\/\//i.test(urlTrimmed);
+  const looksLikeUrlAttempt =
+    urlTrimmed.length > 0 &&
+    (/^(https?:\/\/|[\w.-]+\.(ru|com|net|org|info|рф))/i.test(urlTrimmed));
+
+  /* Живой поиск по сайтам-источникам: поле принимает и ссылку, и слова.
+     После паузы печатания уходит запрос, варианты падают в меню под полем. */
+  useEffect(() => {
+    const value = sourceUrl.trim();
+    if (value.length < 3 || /^https?:\/\//i.test(value)) {
+      searchSeq.current += 1;
+      setSuggestOpen(false);
+      setSuggestLoading(false);
+      setSuggestions([]);
+      setFailedSites([]);
+      return;
+    }
+    const seq = ++searchSeq.current;
+    setSuggestOpen(true);
+    setSuggestLoading(true);
+    setFailedSites([]);
+    setActiveSuggest(-1);
+    const timer = setTimeout(() => {
+      fetch(`/api/source-search?q=${encodeURIComponent(value)}`)
+        .then((res) => res.json())
+        .then((data: { results?: SourceSuggestion[]; failed?: string[] }) => {
+          if (seq !== searchSeq.current) return;
+          setSuggestions(data.results ?? []);
+          setFailedSites(data.failed ?? []);
+          setSuggestLoading(false);
+        })
+        .catch(() => {
+          if (seq !== searchSeq.current) return;
+          setSuggestions([]);
+          setFailedSites(["1001zagotovka.ru", "only-paper.ru"]);
+          setSuggestLoading(false);
+        });
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [sourceUrl]);
+
+  function pickSuggestion(item: SourceSuggestion) {
+    setSourceUrl(item.url);
+    searchSeq.current += 1;
+    setSuggestOpen(false);
+    setSuggestLoading(false);
+    setActiveSuggest(-1);
+  }
 
   async function generate(mode: "topic" | "url") {
     if (busy) return;
@@ -365,24 +427,123 @@ export function GenerateCraft() {
           </div>
 
           <label htmlFor="source-url" className="text-sm font-bold">
-            Повторить по ссылке-оригиналу
+            Повторить по образцу — ссылка или поиск
           </label>
           <p className="mt-1 text-xs text-ink-soft">
-            Ссылка на чужой мастер-класс (only-paper.ru, 1001zagotovka.ru) — ИИ изучит источник и составит свой вариант
+            Вставьте ссылку на чужой мастер-класс — или вводите слова, и мы
+            подскажем готовые варианты с 1001zagotovka.ru и only-paper.ru
           </p>
           <div className="mt-3 flex flex-col gap-3 sm:flex-row">
-            <input
-              id="source-url"
-              type="url"
-              inputMode="url"
-              value={sourceUrl}
-              onChange={(event) => setSourceUrl(event.target.value)}
-              onKeyDown={(event) => event.key === "Enter" && generate("url")}
-              disabled={busy}
-              maxLength={2000}
-              placeholder="https://only-paper.ru/…"
-              className="min-h-12 w-full rounded-xl bg-paper-deep/60 px-4 text-sm outline-none ring-1 ring-ink/10 transition focus:ring-2 focus:ring-clay disabled:opacity-60"
-            />
+            <div
+              className="relative min-w-0 flex-1"
+              onBlur={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                  setSuggestOpen(false);
+                }
+              }}
+            >
+              <Search
+                className="pointer-events-none absolute left-4 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-ink-soft"
+                aria-hidden
+              />
+              <input
+                id="source-url"
+                type="text"
+                autoComplete="off"
+                role="combobox"
+                aria-expanded={suggestOpen}
+                aria-controls="source-suggestions"
+                aria-autocomplete="list"
+                aria-activedescendant={
+                  activeSuggest >= 0 ? `source-suggest-${activeSuggest}` : undefined
+                }
+                value={sourceUrl}
+                onChange={(event) => setSourceUrl(event.target.value)}
+                onFocus={() => {
+                  if (queryLike) setSuggestOpen(true);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "ArrowDown" && suggestOpen && suggestions.length > 0) {
+                    event.preventDefault();
+                    setActiveSuggest((i) => Math.min(i + 1, suggestions.length - 1));
+                  } else if (event.key === "ArrowUp" && suggestOpen && suggestions.length > 0) {
+                    event.preventDefault();
+                    setActiveSuggest((i) => Math.max(i - 1, -1));
+                  } else if (event.key === "Escape" && suggestOpen) {
+                    setSuggestOpen(false);
+                  } else if (event.key === "Enter") {
+                    if (suggestOpen && activeSuggest >= 0 && suggestions[activeSuggest]) {
+                      event.preventDefault();
+                      pickSuggestion(suggestions[activeSuggest]);
+                    } else {
+                      generate("url");
+                    }
+                  }
+                }}
+                disabled={busy}
+                maxLength={2000}
+                placeholder="Ссылка на МК или слова для поиска"
+                className="min-h-12 w-full rounded-xl bg-paper-deep/60 pl-10 pr-4 text-sm outline-none ring-1 ring-ink/10 transition focus:ring-2 focus:ring-clay disabled:opacity-60"
+              />
+              {suggestOpen && (
+                <div
+                  id="source-suggestions"
+                  className="absolute inset-x-0 top-full z-30 mt-2 overflow-hidden rounded-xl bg-white shadow-soft ring-1 ring-ink/10"
+                >
+                  {suggestLoading && (
+                    <p className="flex items-center gap-2 px-4 py-3 text-xs text-ink-soft">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+                      Ищем на 1001zagotovka.ru и only-paper.ru…
+                    </p>
+                  )}
+                  {!suggestLoading && suggestions.length === 0 && (
+                    <p className="px-4 py-3 text-xs text-ink-soft">
+                      {failedSites.length > 0
+                        ? "Поиск сейчас недоступен — вставьте ссылку на мастер-класс вручную"
+                        : "Ничего не нашлось — попробуйте другие слова или вставьте ссылку"}
+                    </p>
+                  )}
+                  {suggestions.length > 0 && (
+                    <ul
+                      role="listbox"
+                      aria-label="Варианты с сайтов-источников"
+                      className="max-h-72 scrollbar-none overflow-y-auto"
+                    >
+                      {suggestions.map((item, index) => (
+                        <li key={item.url}>
+                          <button
+                            type="button"
+                            id={`source-suggest-${index}`}
+                            role="option"
+                            aria-selected={index === activeSuggest}
+                            tabIndex={-1}
+                            onMouseDown={(event) => event.preventDefault()}
+                            onMouseEnter={() => setActiveSuggest(index)}
+                            onClick={() => pickSuggestion(item)}
+                            className={cn(
+                              "flex w-full flex-col gap-0.5 px-4 py-2.5 text-left transition-colors",
+                              index === activeSuggest ? "bg-clay-soft/70" : "bg-white"
+                            )}
+                          >
+                            <span className="text-[10px] font-bold uppercase tracking-wide text-[#8A4A2C]">
+                              {item.siteLabel}
+                            </span>
+                            <span className="line-clamp-2 text-sm font-medium leading-snug">
+                              {item.title}
+                            </span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {suggestions.length > 0 && failedSites.length > 0 && (
+                    <p className="border-t border-ink/10 px-4 py-2 text-[11px] text-ink-soft">
+                      Не удалось спросить: {failedSites.join(", ")}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
             <button
               type="button"
               onClick={() => generate("url")}
@@ -397,7 +558,7 @@ export function GenerateCraft() {
               Из источника
             </button>
           </div>
-          {!urlValid && urlTrimmed.length > 0 && (
+          {looksLikeUrlAttempt && !urlValid && (
             <p className="mt-2 text-xs font-medium text-[#9C5570]">
               Вставьте полную ссылку, начинающуюся с http:// или https://
             </p>
