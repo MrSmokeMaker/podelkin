@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowDownToLine, X } from "lucide-react";
 
 interface BeforeInstallPromptEvent extends Event {
@@ -12,6 +12,7 @@ const DISMISS_KEY = "podelki:install-dismissed";
 export function InstallBanner() {
   const [promptEvent, setPromptEvent] = useState<BeforeInstallPromptEvent | null>(null);
   const [hidden, setHidden] = useState(true);
+  const prompting = useRef(false);
 
   useEffect(() => {
     try {
@@ -24,8 +25,13 @@ export function InstallBanner() {
       setPromptEvent(event as BeforeInstallPromptEvent);
       setHidden(false);
     };
+    const installed = () => setHidden(true);
     window.addEventListener("beforeinstallprompt", handler);
-    return () => window.removeEventListener("beforeinstallprompt", handler);
+    window.addEventListener("appinstalled", installed);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handler);
+      window.removeEventListener("appinstalled", installed);
+    };
   }, []);
 
   if (hidden || !promptEvent) return null;
@@ -39,9 +45,19 @@ export function InstallBanner() {
     }
   };
 
+  /* Повторный prompt() на протухшем событии браузер отклоняет с
+     InvalidStateError — гасим и защищаем от двойного клика. */
   const install = async () => {
-    await promptEvent.prompt();
-    dismiss();
+    if (!promptEvent || prompting.current) return;
+    prompting.current = true;
+    try {
+      await promptEvent.prompt();
+    } catch {
+      /* браузер отказался показать диалог — баннер просто скроется */
+    } finally {
+      prompting.current = false;
+      dismiss();
+    }
   };
 
   return (
