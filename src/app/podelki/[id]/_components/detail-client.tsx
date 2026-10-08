@@ -113,6 +113,27 @@ export function DetailClient({ item }: { item: CatalogItem }) {
             <p className="text-sm leading-relaxed text-ink">{item.description}</p>
           )}
 
+          {item.instructions && item.instructions.length > 0 && (
+            <section aria-labelledby="podelka-instructions">
+              <h2
+                id="podelka-instructions"
+                className="text-sm font-semibold uppercase tracking-wide text-ink-soft"
+              >
+                Инструкция
+              </h2>
+              <ol className="mt-2 space-y-2.5">
+                {item.instructions.map((step, index) => (
+                  <li key={index} className="flex items-start gap-2.5 text-sm leading-relaxed">
+                    <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-clay-soft text-[11px] font-bold text-[#8A4A2C]">
+                      {index + 1}
+                    </span>
+                    <span>{step}</span>
+                  </li>
+                ))}
+              </ol>
+            </section>
+          )}
+
           {item.materials.length > 0 && (
             <section aria-labelledby="podelka-materials">
               <h2

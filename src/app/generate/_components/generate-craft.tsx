@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import Link from "next/link";
 import {
+  ArrowRight,
   CheckCircle2,
   Clock,
   ImageOff,
@@ -17,6 +19,7 @@ import { cn } from "@/lib/utils";
 import { difficultyTone, formatMinutes } from "@/lib/crafts";
 import { useFeatureFlags } from "@/hooks/use-feature-flags";
 import { useToast } from "@/components/toast";
+import type { CatalogItem } from "@/lib/catalog-db";
 
 interface DraftData {
   title: string;
@@ -178,12 +181,13 @@ export function GenerateCraft() {
   const toast = useToast();
   const [topic, setTopic] = useState("");
   const [sourceUrl, setSourceUrl] = useState("");
-  const [pendingMode, setPendingMode] = useState<"topic" | "url" | null>(null);
   const [phase, setPhase] = useState<Phase>("form");
   const [draft, setDraft] = useState<DraftInfo | null>(null);
   const [result, setResult] = useState<ApproveResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [remainingQuota, setRemainingQuota] = useState<number | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [imported, setImported] = useState<CatalogItem | null>(null);
   const [suggestions, setSuggestions] = useState<SourceSuggestion[]>([]);
   const [suggestOpen, setSuggestOpen] = useState(false);
   const [suggestLoading, setSuggestLoading] = useState(false);
@@ -195,7 +199,7 @@ export function GenerateCraft() {
   const topicValid = trimmed.length >= 3 && trimmed.length <= 120;
   const urlTrimmed = sourceUrl.trim();
   const urlValid = /^https?:\/\/\S{4,}/i.test(urlTrimmed);
-  const busy = phase === "generating" || phase === "approving";
+  const busy = phase === "generating" || phase === "approving" || importing;
   const queryLike = urlTrimmed.length >= 3 && !/^https?:\/\//i.test(urlTrimmed);
   const looksLikeUrlAttempt =
     urlTrimmed.length > 0 &&
@@ -245,18 +249,49 @@ export function GenerateCraft() {
     setActiveSuggest(-1);
   }
 
-  async function generate(mode: "topic" | "url") {
-    if (busy) return;
-    const byTopic = mode === "topic";
-    if (byTopic ? !topicValid : !urlValid) return;
+  /* Импорт из источника: страница разбирается на сервере, поделка сразу
+     попадает в каталог «Поделки» — без AI-генерации и без квоты. */
+  async function importFromSource() {
+    if (busy || !urlValid) return;
+    setImporting(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/catalog/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: urlTrimmed }),
+      });
+      const body = (await res.json().catch(() => null)) as {
+        item?: CatalogItem;
+        error?: string;
+      } | null;
+
+      if (res.ok && body?.item) {
+        setImported(body.item);
+        setSourceUrl("");
+        toast(
+          "Поделка добавлена в «Поделки»",
+          body.item.thumbnail ? undefined : "Итоговое фото скачать не удалось"
+        );
+        return;
+      }
+      setError(body?.error ?? `Не удалось добавить поделку (${res.status})`);
+    } catch {
+      setError("Сеть недоступна — проверьте соединение и попробуйте ещё раз");
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  async function generate() {
+    if (busy || !topicValid) return;
     setPhase("generating");
-    setPendingMode(mode);
     setError(null);
     try {
       const res = await fetch(`/api/crafts/from-ai?role=${role}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(byTopic ? { prompt: trimmed } : { url: urlTrimmed }),
+        body: JSON.stringify({ prompt: trimmed }),
       });
       const body = (await res.json().catch(() => null)) as {
         draftId?: string;
@@ -275,7 +310,6 @@ export function GenerateCraft() {
         });
         setRemainingQuota(Number(body.remainingQuota) || 0);
         setPhase("draft");
-        setPendingMode(null);
         if (body.cached) {
           toast(
             "Черновик из кэша",
@@ -296,11 +330,9 @@ export function GenerateCraft() {
         setError(body?.error ?? `Ошибка генерации (${res.status})`);
       }
       setPhase("form");
-      setPendingMode(null);
     } catch {
       setError("Сеть недоступна — проверьте соединение и попробуйте ещё раз");
       setPhase("form");
-      setPendingMode(null);
     }
   }
 
@@ -353,7 +385,6 @@ export function GenerateCraft() {
   function backToForm() {
     setDraft(null);
     setError(null);
-    setPendingMode(null);
     setPhase("form");
   }
 
@@ -362,7 +393,6 @@ export function GenerateCraft() {
     setResult(null);
     setTopic("");
     setSourceUrl("");
-    setPendingMode(null);
     setError(null);
     setPhase("form");
   }
@@ -378,7 +408,7 @@ export function GenerateCraft() {
         </div>
       )}
 
-      {(phase === "form" || phase === "generating") && (
+      {(phase === "form" || phase === "generating") && !imported && (
         <section
           aria-label="Генерация поделки"
           className="rounded-2xl bg-white p-5 shadow-card ring-1 ring-ink/5 sm:p-6"
@@ -394,7 +424,7 @@ export function GenerateCraft() {
               id="topic"
               value={topic}
               onChange={(event) => setTopic(event.target.value)}
-              onKeyDown={(event) => event.key === "Enter" && generate("topic")}
+              onKeyDown={(event) => event.key === "Enter" && generate()}
               disabled={busy}
               maxLength={120}
               placeholder="О чём мастер-класс?"
@@ -402,11 +432,11 @@ export function GenerateCraft() {
             />
             <button
               type="button"
-              onClick={() => generate("topic")}
+              onClick={generate}
               disabled={busy || !topicValid}
               className={cn(PRIMARY_BTN, "sm:w-auto")}
             >
-              {pendingMode === "topic" ? (
+              {phase === "generating" ? (
                 <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
               ) : (
                 <Sparkles className="h-4 w-4" aria-hidden />
@@ -427,11 +457,12 @@ export function GenerateCraft() {
           </div>
 
           <label htmlFor="source-url" className="text-sm font-bold">
-            Повторить по образцу — ссылка или поиск
+            Добавить в «Поделки» из источника
           </label>
           <p className="mt-1 text-xs text-ink-soft">
-            Вставьте ссылку на чужой мастер-класс — или вводите слова, и мы
-            подскажем готовые варианты с 1001zagotovka.ru и only-paper.ru
+            Вставьте ссылку на мастер-класс — или вводите слова для поиска.
+            Поделка сохранится в «Поделки» с итоговым фото, шагами и материалами
+            со страницы-оригинала — без AI-генерации и без списания квоты
           </p>
           <div className="mt-3 flex flex-col gap-3 sm:flex-row">
             <div
@@ -476,7 +507,7 @@ export function GenerateCraft() {
                       event.preventDefault();
                       pickSuggestion(suggestions[activeSuggest]);
                     } else {
-                      generate("url");
+                      importFromSource();
                     }
                   }
                 }}
@@ -546,16 +577,16 @@ export function GenerateCraft() {
             </div>
             <button
               type="button"
-              onClick={() => generate("url")}
+              onClick={importFromSource}
               disabled={busy || !urlValid}
               className={cn(SECONDARY_BTN, "sm:w-auto")}
             >
-              {pendingMode === "url" ? (
+              {importing ? (
                 <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
               ) : (
                 <Link2 className="h-4 w-4" aria-hidden />
               )}
-              Из источника
+              {importing ? "Сохраняем…" : "Из источника"}
             </button>
           </div>
           {looksLikeUrlAttempt && !urlValid && (
@@ -587,6 +618,76 @@ export function GenerateCraft() {
                 {suggestion}
               </button>
             ))}
+          </div>
+        </section>
+      )}
+
+      {imported && (
+        <section
+          aria-label="Поделка добавлена в каталог"
+          className="rounded-2xl bg-white p-5 shadow-card ring-1 ring-ink/5 sm:p-6"
+        >
+          <div className="flex items-center gap-3">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-sage-soft text-[#55693F]">
+              <CheckCircle2 className="h-6 w-6" aria-hidden />
+            </span>
+            <div className="min-w-0">
+              <h2 className="text-lg font-bold">Добавлено в «Поделки»</h2>
+              <p className="truncate text-sm text-ink-soft">{imported.title}</p>
+            </div>
+          </div>
+
+          {imported.thumbnail ? (
+            <CraftCover
+              url={imported.thumbnail}
+              alt={`Итоговое фото поделки: ${imported.title}`}
+              seedValue={imported.id}
+            />
+          ) : (
+            <div className="mt-4 flex flex-col items-center gap-2 rounded-2xl border-2 border-dashed border-ink/15 p-8 text-center">
+              <ImageOff className="h-8 w-8 text-ink-soft" aria-hidden />
+              <p className="text-sm font-medium">Итоговое фото скачать не удалось</p>
+              <p className="text-xs text-ink-soft">
+                Шаги и материалы сохранены — фото можно добавить позже вручную.
+              </p>
+            </div>
+          )}
+
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <Chip className="bg-paper-deep text-ink-soft">{imported.category}</Chip>
+            {imported.instructions && imported.instructions.length > 0 && (
+              <Chip className="bg-paper-deep text-ink-soft">
+                Шагов: {imported.instructions.length}
+              </Chip>
+            )}
+            {imported.materials.length > 0 && (
+              <Chip className="bg-paper-deep text-ink-soft">
+                Материалов: {imported.materials.length}
+              </Chip>
+            )}
+            {imported.assemblyTime && (
+              <Chip className="bg-mist-soft text-[#4A6D8C]">
+                <Clock className="h-3.5 w-3.5" aria-hidden />
+                {imported.assemblyTime}
+              </Chip>
+            )}
+          </div>
+
+          <div className="mt-5 flex flex-wrap gap-3">
+            <Link href={`/podelki/${imported.id}`} className={PRIMARY_BTN}>
+              <ArrowRight className="h-4 w-4" aria-hidden />
+              Открыть в поделках
+            </Link>
+            <button
+              type="button"
+              onClick={() => {
+                setImported(null);
+                setError(null);
+              }}
+              className={SECONDARY_BTN}
+            >
+              Добавить ещё
+            </button>
           </div>
         </section>
       )}

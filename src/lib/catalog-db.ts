@@ -28,6 +28,7 @@ export interface CatalogItem {
   description: string;
   difficulty: CatalogDifficulty;
   materials: string[];
+  instructions?: string[];
   assemblyTime: string;
   thumbnail: string | null;
   templateUrl: string | null;
@@ -123,6 +124,7 @@ export function createCatalogItem(input: {
   description: string;
   difficulty: CatalogDifficulty;
   materials: string[];
+  instructions?: string[];
   assemblyTime: string;
   thumbnail: string | null;
   templateUrl: string | null;

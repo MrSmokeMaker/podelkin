@@ -12,7 +12,7 @@ import {
   type CraftGenerationInput,
 } from "@/server/services/craftDraft";
 import { AiGatewayError } from "@/server/services/aiClient";
-import { fetchSourceText } from "@/server/services/sourceFetcher";
+import { fetchSourceText, parseSourceUrl } from "@/server/services/sourceFetcher";
 
 export const dynamic = "force-dynamic";
 
@@ -130,33 +130,4 @@ export async function POST(request: NextRequest) {
       { status: 502 }
     );
   }
-}
-
-/**
- * Только публичные http(s)-адреса: никакой localhost, внутренней сети
- * и нестандартных схем — пользовательский ввод не превращается в SSRF.
- */
-function parseSourceUrl(raw: string): URL | null {
-  if (raw.length === 0 || raw.length > 2000) return null;
-  let parsed: URL;
-  try {
-    parsed = new URL(raw);
-  } catch {
-    return null;
-  }
-  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return null;
-  const host = parsed.hostname.toLowerCase();
-  if (
-    host === "localhost" ||
-    host.endsWith(".localhost") ||
-    host.endsWith(".local") ||
-    host.endsWith(".internal") ||
-    // Голый IPv4 (включая приватные диапазоны 10.x, 192.168.x, 169.254.x) — сразу нет.
-    /^\d{1,3}(\.\d{1,3}){3}$/.test(host) ||
-    host === "0.0.0.0" ||
-    host === "[::1]"
-  ) {
-    return null;
-  }
-  return parsed;
 }

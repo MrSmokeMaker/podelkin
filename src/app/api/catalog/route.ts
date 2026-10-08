@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { parseSourceUrl } from "@/server/services/sourceFetcher";
+import { importCraftFromSource } from "@/server/services/sourceImport";
 import {
   catalogItems,
   createCatalogItem,
@@ -40,6 +42,14 @@ function splitList(value: FormDataEntryValue | null): string[] {
 }
 
 export async function POST(request: Request) {
+  const contentType = request.headers.get("content-type") ?? "";
+
+  /* JSON { url } — импорт поделки со страницы-источника (кнопка «Из источника»);
+     multipart/form-data — ручное добавление из формы «Новая поделка». */
+  if (contentType.includes("application/json")) {
+    return importFromSourcePage(request);
+  }
+
   let form: FormData;
   try {
     form = await request.formData();
@@ -123,6 +133,70 @@ export async function POST(request: Request) {
     thumbnail,
     templateUrl: templateUrl || null,
     tags: splitList(form.get("tags")),
+  });
+
+  return NextResponse.json({ item }, { status: 201 });
+}
+
+/* Импорт: страница мастер-класса разбирается на сервере, поделка сразу
+   попадает в каталог — без AI-генерации и без списания квоты. */
+async function importFromSourcePage(request: Request) {
+  const body = (await request.json().catch(() => null)) as { url?: unknown } | null;
+  const raw = typeof body?.url === "string" ? body.url.trim() : "";
+
+  const parsed = parseSourceUrl(raw);
+  if (!parsed) {
+    return NextResponse.json(
+      { error: "Укажите корректную ссылку, начинающуюся с http:// или https://" },
+      { status: 400 }
+    );
+  }
+  const host = parsed.hostname.replace(/^www\./, "");
+  if (!ALLOWED_SOURCE_DOMAINS.some((domain) => host === domain || host.endsWith(`.${domain}`))) {
+    return NextResponse.json(
+      { error: "Поддерживаются ссылки только на only-paper.ru и 1001zagotovka.ru" },
+      { status: 400 }
+    );
+  }
+
+  // Повторный импорт той же страницы не плодит дубликаты в каталоге.
+  const existing = catalogItems.find((item) => item.sourceUrl === parsed.href);
+  if (existing) {
+    return NextResponse.json({ item: existing, existing: true });
+  }
+
+  let imported;
+  try {
+    imported = await importCraftFromSource(parsed);
+  } catch (error) {
+    const timedOut = error instanceof Error && error.name === "TimeoutError";
+    return NextResponse.json(
+      {
+        error: timedOut
+          ? "Страница-источник не ответила за 15 секунд"
+          : "Не удалось разобрать страницу-источник",
+      },
+      { status: 422 }
+    );
+  }
+
+  // Косвенная оценка сложности: чем длиннее инструкция, тем она трудоёмче.
+  const stepCount = imported.instructions.length;
+  const difficulty: CatalogDifficulty =
+    stepCount >= 8 ? "сложно" : stepCount > 0 && stepCount <= 4 ? "легко" : "средне";
+
+  const item = createCatalogItem({
+    title: imported.title,
+    category: imported.category,
+    sourceUrl: parsed.href,
+    description: imported.description,
+    difficulty,
+    materials: imported.materials,
+    instructions: imported.instructions,
+    assemblyTime: imported.assemblyTime,
+    thumbnail: imported.imageUrl,
+    templateUrl: null,
+    tags: [],
   });
 
   return NextResponse.json({ item }, { status: 201 });
