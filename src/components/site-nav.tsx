@@ -49,13 +49,13 @@ export function SiteHeader() {
       <div className="mx-auto flex h-16 w-full max-w-5xl items-center justify-between gap-2 px-4">
         <Link
           href="/"
-          aria-label="Рукоделие — на главную"
+          aria-label="Podelkin — на главную"
           className="flex items-center gap-2.5 py-2"
         >
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-clay text-paper shadow-card">
             <Scissors className="h-5 w-5" />
           </span>
-          <span className="text-lg font-bold tracking-tight">Рукоделие</span>
+          <span className="text-lg font-bold tracking-tight">Podelkin</span>
         </Link>
         <div className="flex items-center gap-1">
           <nav className="hidden items-center gap-1 md:flex" aria-label="Основная">

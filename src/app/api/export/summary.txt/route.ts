@@ -34,7 +34,7 @@ export function GET(request: Request) {
   const mostUsed = [...usage.entries()].sort((a, b) => b[1] - a[1])[0];
 
   const lines = [
-    "Рукоделие — сводка мастерской",
+    "Podelkin — сводка мастерской",
     `Сгенерировано: ${new Date().toLocaleString("ru-RU")}`,
     `Тариф: ${user.role}`,
     "",

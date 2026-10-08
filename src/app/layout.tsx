@@ -9,21 +9,21 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: {
-    default: "Рукоделие — мастерская идей",
-    template: "%s — Рукоделие",
+    default: "Podelkin — мастерская идей",
+    template: "%s — Podelkin",
   },
   description:
     "Пошаговые мастер-классы по рукоделию: керамика, дерево, пряжа, свечи и не только. Списки покупок, запасы и статистика мастерской.",
-  applicationName: "Рукоделие",
+  applicationName: "Podelkin",
   manifest: "/manifest.json",
   icons: { icon: "/icon.svg" },
   openGraph: {
-    title: "Рукоделие — мастерская идей",
+    title: "Podelkin — мастерская идей",
     description:
       "Пошаговые мастер-классы по рукоделию: керамика, дерево, пряжа, свечи и не только. Списки покупок, запасы и статистика мастерской.",
     type: "website",
     locale: "ru_RU",
-    siteName: "Рукоделие",
+    siteName: "Podelkin",
   },
 };
 

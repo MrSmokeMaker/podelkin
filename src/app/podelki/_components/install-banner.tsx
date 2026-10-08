@@ -48,7 +48,7 @@ export function InstallBanner() {
     <div className="flex flex-wrap items-center gap-3 rounded-2xl bg-white p-4 shadow-card ring-1 ring-ink/5">
       <ArrowDownToLine aria-hidden className="h-5 w-5 shrink-0 text-clay" />
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-semibold">Установить «Рукоделие»</p>
+        <p className="text-sm font-semibold">Установить «Podelkin»</p>
         <p className="text-xs text-ink-soft">
           Каталог поделок будет доступен офлайн
         </p>
