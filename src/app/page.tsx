@@ -68,8 +68,8 @@ export default function HomePage() {
           </Link>
         </div>
         <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {featured.map((craft) => (
-            <CraftCard key={craft.slug} craft={craft} />
+          {featured.map((craft, index) => (
+            <CraftCard key={craft.slug} craft={craft} index={index} />
           ))}
         </div>
       </section>

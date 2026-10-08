@@ -10,11 +10,12 @@ import {
   type Craft,
 } from "@/lib/crafts";
 
-export function CraftCard({ craft }: { craft: Craft }) {
+export function CraftCard({ craft, index }: { craft: Craft; index?: number }) {
   return (
     <Link
       href={`/craft/${craft.slug}`}
-      className="group flex flex-col overflow-hidden rounded-2xl bg-white shadow-card ring-1 ring-ink/5 transition-all duration-200 hover:-translate-y-1 hover:shadow-soft focus-visible:outline-2 focus-visible:outline-clay active:translate-y-0"
+      style={index !== undefined ? { animationDelay: `${Math.min(index, 8) * 45}ms` } : undefined}
+      className="animate-card-in group flex flex-col overflow-hidden rounded-2xl bg-white shadow-card ring-1 ring-ink/5 transition-all duration-200 hover:-translate-y-1 hover:shadow-soft focus-visible:outline-2 focus-visible:outline-clay active:translate-y-0"
     >
       <div className="relative">
         <CraftPhoto craft={craft} />
