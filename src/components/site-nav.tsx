@@ -28,13 +28,12 @@ const links = [
 
 const mobileLinks = [
   { href: "/catalog", label: "Каталог", icon: LayoutGrid },
-  { href: "/build", label: "Мастер", icon: Scissors },
+  { href: "/podelki", label: "Поделки", icon: Shapes },
   { href: "/inventory", label: "Запасы", icon: Boxes },
   { href: "/profile", label: "Профиль", icon: UserRound },
 ];
 
 function isActive(pathname: string, href: string) {
-  if (href === "/build") return pathname.startsWith("/build");
   return pathname.startsWith(href);
 }
 

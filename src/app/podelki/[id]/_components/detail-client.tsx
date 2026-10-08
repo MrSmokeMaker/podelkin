@@ -8,6 +8,7 @@ import {
   Clock,
   Download,
   ExternalLink,
+  Hammer,
   Heart,
   Share2,
 } from "lucide-react";
@@ -15,11 +16,13 @@ import { cn } from "@/lib/utils";
 import { readFavoriteIds, toggleFavoriteId } from "@/lib/favorites";
 import { useToast } from "@/components/toast";
 import { categoryIcon, DIFFICULTY_STYLES } from "../../_components/catalog-visuals";
+import { MasterModeOverlay } from "./master-mode-overlay";
 import type { CatalogItem } from "@/lib/catalog-db";
 
 export function DetailClient({ item }: { item: CatalogItem }) {
   const toast = useToast();
   const [isFavorite, setIsFavorite] = useState(false);
+  const [masterOpen, setMasterOpen] = useState(false);
 
   useEffect(() => {
     setIsFavorite(readFavoriteIds().includes(item.id));
@@ -169,6 +172,16 @@ export function DetailClient({ item }: { item: CatalogItem }) {
           )}
 
           <div className="flex flex-wrap gap-2">
+            {item.instructions && item.instructions.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setMasterOpen(true)}
+                className="inline-flex items-center gap-1.5 rounded-full bg-clay px-4 py-2 text-sm font-semibold text-white shadow-card transition-colors hover:bg-clay/90"
+              >
+                <Hammer aria-hidden className="h-4 w-4" />
+                Режим мастера
+              </button>
+            )}
             <button
               type="button"
               onClick={onToggleFavorite}
@@ -222,6 +235,10 @@ export function DetailClient({ item }: { item: CatalogItem }) {
           </div>
         </div>
       </div>
+
+      {masterOpen && (
+        <MasterModeOverlay item={item} onClose={() => setMasterOpen(false)} />
+      )}
     </div>
   );
 }

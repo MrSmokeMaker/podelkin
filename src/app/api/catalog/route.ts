@@ -52,6 +52,17 @@ function splitList(value: FormDataEntryValue | null): string[] {
     .slice(0, 20);
 }
 
+/* Шаги инструкции приходят по одному на строку — их же читает режим мастера. */
+function splitSteps(value: FormDataEntryValue | null): string[] | undefined {
+  if (typeof value !== "string") return undefined;
+  const steps = value
+    .split("\n")
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0)
+    .slice(0, 14);
+  return steps.length > 0 ? steps : undefined;
+}
+
 export async function POST(request: Request) {
   const contentType = request.headers.get("content-type") ?? "";
 
@@ -140,6 +151,7 @@ export async function POST(request: Request) {
     description,
     difficulty: difficulty as CatalogDifficulty,
     materials: splitList(form.get("materials")),
+    instructions: splitSteps(form.get("instructions")),
     assemblyTime,
     thumbnail,
     templateUrl: templateUrl || null,

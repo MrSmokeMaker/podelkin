@@ -59,6 +59,7 @@ export function NewPodelkaClient() {
   const [sourceUrl, setSourceUrl] = useState("");
   const [description, setDescription] = useState("");
   const [materials, setMaterials] = useState("");
+  const [instructions, setInstructions] = useState("");
   const [assemblyTime, setAssemblyTime] = useState("");
   const [templateUrl, setTemplateUrl] = useState("");
   const [tags, setTags] = useState("");
@@ -119,6 +120,7 @@ export function NewPodelkaClient() {
       form.set("sourceUrl", sourceUrl.trim());
       form.set("description", description);
       form.set("materials", materials);
+      form.set("instructions", instructions);
       form.set("assemblyTime", assemblyTime);
       form.set("templateUrl", templateUrl.trim());
       form.set("tags", tags);
@@ -351,6 +353,21 @@ export function NewPodelkaClient() {
                 placeholder="через запятую: бумага 200 г/м², клей ПВА, нож"
                 className={inputClass}
               />
+            </div>
+
+            <div className="space-y-1.5">
+              <FieldLabel htmlFor="p-instructions">Инструкция (шаги)</FieldLabel>
+              <textarea
+                id="p-instructions"
+                value={instructions}
+                onChange={(event) => setInstructions(event.target.value)}
+                rows={4}
+                placeholder={"По одному шагу на строку:\nВырежьте детали по контуру\nСклейте основу и дайте высохнуть"}
+                className={cn(inputClass, "resize-y")}
+              />
+              <p className="text-xs text-ink-soft">
+                Шаги нужны для режима мастера — если их нет, он не запустится
+              </p>
             </div>
 
             <div className="space-y-1.5">
