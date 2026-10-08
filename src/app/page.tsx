@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Clock, RefreshCw } from "lucide-react";
+import { Clock, RefreshCw } from "lucide-react";
 import { CraftPhoto } from "@/components/craft-photo";
 import {
   categoryIcon,
@@ -144,7 +144,7 @@ export default function HomePage() {
   const TodayIcon = today.category ? categoryIcon(today.category) : null;
 
   return (
-    <div className="space-y-9">
+    <div className="space-y-4 sm:space-y-6">
       <section aria-labelledby="today-heading">
         <div className="flex items-center justify-between gap-3">
           <h1
@@ -169,16 +169,16 @@ export default function HomePage() {
         <Link
           key={today.key}
           href={today.href}
-          className="group mt-4 flex animate-card-in gap-4 rounded-3xl bg-white p-4 shadow-card ring-1 ring-ink/5 transition hover:shadow-soft sm:gap-6 sm:p-5"
+          className="group mt-3 flex animate-card-in gap-4 rounded-3xl bg-white p-4 shadow-card ring-1 ring-ink/5 transition hover:shadow-soft sm:gap-5 sm:p-4"
         >
           {today.craft ? (
             <CraftPhoto
               craft={today.craft}
-              className="h-28 w-28 shrink-0 sm:h-44 sm:w-44"
+              className="h-24 w-24 shrink-0 sm:h-32 sm:w-32"
               rounded="rounded-2xl"
             />
           ) : (
-            <div className="relative h-28 w-28 shrink-0 overflow-hidden rounded-2xl bg-paper-deep sm:h-44 sm:w-44">
+            <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-2xl bg-paper-deep sm:h-32 sm:w-32">
               {today.thumbnail ? (
                 <img
                   src={today.thumbnail}
@@ -205,7 +205,7 @@ export default function HomePage() {
                 {today.difficulty}
               </span>
             </div>
-            <p className="mt-1.5 line-clamp-2 text-sm text-ink-soft sm:line-clamp-3">
+            <p className="mt-1 line-clamp-2 text-sm text-ink-soft">
               {today.description}
             </p>
             <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-medium text-ink-soft">
@@ -237,9 +237,9 @@ export default function HomePage() {
         >
           Идеи из твоих запасов
         </h2>
-        <ul className="scrollbar-none -mx-4 mt-4 flex snap-x gap-3 overflow-x-auto px-4 pb-1">
+        <ul className="scrollbar-none -mx-4 mt-3 flex snap-x gap-3 overflow-x-auto px-4 pb-1">
           {ideas.map((craft) => (
-            <li key={craft.slug} className="w-40 shrink-0 snap-start sm:w-44">
+            <li key={craft.slug} className="w-36 shrink-0 snap-start sm:w-40">
               <Link
                 href={`/craft/${craft.slug}`}
                 className="group block overflow-hidden rounded-2xl bg-white shadow-card ring-1 ring-ink/5 transition hover:shadow-soft"
@@ -249,7 +249,7 @@ export default function HomePage() {
                   className="aspect-square w-full"
                   rounded="rounded-none"
                 />
-                <div className="p-3">
+                <div className="p-2.5">
                   <h3 className="line-clamp-1 text-sm font-bold group-hover:text-[#8A4A2C]">
                     {craft.title}
                   </h3>
@@ -262,17 +262,6 @@ export default function HomePage() {
           ))}
         </ul>
       </section>
-
-      <Link
-        href="/inventory"
-        className="group inline-flex items-center gap-1.5 text-sm font-semibold text-[#8A4A2C] hover:underline"
-      >
-        Все мои запасы
-        <ArrowRight
-          className="h-4 w-4 transition group-hover:translate-x-0.5"
-          aria-hidden
-        />
-      </Link>
     </div>
   );
 }

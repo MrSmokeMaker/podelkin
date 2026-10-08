@@ -52,7 +52,7 @@ export default function RootLayout({
         <ToastProvider>
           <SessionProvider>
             <SiteHeader />
-            <main className="mx-auto w-full max-w-5xl px-4 pb-28 pt-6 md:pb-16">
+            <main className="mx-auto w-full max-w-5xl px-4 pb-24 pt-4 sm:pt-6 md:pb-16">
               {children}
             </main>
             <BottomNav />

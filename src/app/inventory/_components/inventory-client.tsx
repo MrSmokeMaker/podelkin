@@ -45,10 +45,10 @@ const TONE_LABEL: Record<Tone, string> = {
   green: "Много",
 };
 
-const TONE_TEXT: Record<Tone, string> = {
-  red: "text-red-700",
-  amber: "text-amber-700",
-  green: "text-[#55693F]",
+const TONE_CHIP: Record<Tone, string> = {
+  red: "bg-red-50 text-red-700",
+  amber: "bg-amber-50 text-amber-700",
+  green: "bg-sage-soft text-[#55693F]",
 };
 
 function pluralRu(n: number, one: string, few: string, many: string): string {
@@ -288,7 +288,7 @@ export function InventoryClient({ items }: { items: StockItem[] }) {
           Под этот фильтр ничего не нашлось.
         </p>
       ) : (
-        <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        <ul className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
           {visible.map((item) => {
             const tone = toneOf(percentOf(item));
             const need = usage.get(item.name) ?? 0;
@@ -296,7 +296,7 @@ export function InventoryClient({ items }: { items: StockItem[] }) {
             const days = 1 + (hashName(item.name) % 9);
             return (
               <li key={item.name}>
-                <div className="flex h-full flex-col overflow-hidden rounded-2xl bg-white shadow-card ring-1 ring-ink/5">
+                <div className="flex h-full flex-col overflow-hidden rounded-2xl bg-white shadow-card ring-1 ring-ink/5 transition duration-200 hover:-translate-y-0.5 hover:shadow-soft">
                   <button
                     type="button"
                     onClick={() => setOpenName(open ? null : item.name)}
@@ -304,25 +304,32 @@ export function InventoryClient({ items }: { items: StockItem[] }) {
                     aria-label={`${item.name}: ${TONE_LABEL[tone]}. ${open ? "Свернуть" : "Развернуть"}`}
                     className="block w-full text-left"
                   >
-                    <MaterialSwatch
-                      name={item.name}
-                      className="aspect-[4/3] w-full"
-                    />
-                    <div className="p-3">
-                      <h2 className="line-clamp-2 min-h-10 text-sm font-bold leading-snug">
+                    <div className="relative">
+                      <MaterialSwatch
+                        name={item.name}
+                        className="aspect-[16/9] w-full"
+                      />
+                      <span className="absolute left-2 top-2 rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-bold text-ink shadow-sm">
+                        {item.stock === 0
+                          ? "Пусто"
+                          : `${formatQty(item.stock)} ${item.unit}`}
+                      </span>
+                    </div>
+                    <div className="p-2.5 pb-2">
+                      <h2 className="line-clamp-1 text-sm font-bold leading-snug">
                         {item.name}
                       </h2>
-                      <div className="mt-2 flex items-center justify-between gap-1">
+                      <div className="mt-1.5 flex items-center justify-between gap-1">
                         <span
                           className={cn(
-                            "flex items-center gap-1.5 text-[11px] font-bold",
-                            TONE_TEXT[tone]
+                            "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold",
+                            TONE_CHIP[tone]
                           )}
                         >
                           <span
                             aria-hidden
                             className={cn(
-                              "h-2.5 w-2.5 shrink-0 rounded-full",
+                              "h-1.5 w-1.5 shrink-0 rounded-full",
                               TONE_DOT[tone]
                             )}
                           />
@@ -331,7 +338,7 @@ export function InventoryClient({ items }: { items: StockItem[] }) {
                         <ChevronDown
                           aria-hidden
                           className={cn(
-                            "h-4 w-4 shrink-0 text-ink-soft transition-transform",
+                            "h-3.5 w-3.5 shrink-0 text-ink-soft transition-transform",
                             open && "rotate-180"
                           )}
                         />
@@ -346,34 +353,34 @@ export function InventoryClient({ items }: { items: StockItem[] }) {
                         : "grid-rows-[0fr] opacity-0"
                     )}
                   >
-                    <div className="min-h-0 border-t border-dashed border-ink/10 px-3 py-3">
-                      <p className="text-sm font-semibold">
+                    <div className="min-h-0 border-t border-dashed border-ink/10 px-2.5 py-2.5">
+                      <p className="text-[13px] font-semibold">
                         {item.stock === 0
                           ? "Пусто — пора докупить"
                           : `${formatQty(item.stock)} ${item.unit} — ${contextOf(item.stock, item.unit, need)}`}
                       </p>
-                      <p className="mt-1 text-xs text-ink-soft">
+                      <p className="mt-1 text-[11px] text-ink-soft">
                         {need > 0
                           ? `Использовано: ${formatQty(need)} ${item.unit} на 1 проект`
                           : "Не нужно для мастер-классов"}
                       </p>
-                      <p className="mt-0.5 text-xs text-ink-soft">
+                      <p className="mt-0.5 text-[11px] text-ink-soft">
                         Обновлено:{" "}
                         {fresh.has(item.name) ? "только что" : updatedLabel(days)}
                       </p>
-                      <div className="mt-3 grid grid-cols-2 gap-2">
+                      <div className="mt-2 grid grid-cols-2 gap-2">
                         <button
                           type="button"
                           onClick={() => writeOff(item)}
                           disabled={busyName === item.name}
-                          className="min-h-10 rounded-xl bg-white px-3 text-xs font-semibold text-ink ring-1 ring-ink/10 transition hover:bg-paper-deep active:scale-[0.98] disabled:opacity-50"
+                          className="min-h-9 rounded-xl bg-white px-3 text-[11px] font-semibold text-ink ring-1 ring-ink/10 transition hover:bg-paper-deep active:scale-[0.98] disabled:opacity-50"
                         >
                           {busyName === item.name ? "Списываем…" : "Списать"}
                         </button>
                         <button
                           type="button"
                           onClick={() => buyOne(item)}
-                          className="min-h-10 rounded-xl bg-clay px-3 text-xs font-semibold text-paper shadow-card transition hover:bg-[#B06A48] active:scale-[0.98]"
+                          className="min-h-9 rounded-xl bg-clay px-3 text-[11px] font-semibold text-paper shadow-card transition hover:bg-[#B06A48] active:scale-[0.98]"
                         >
                           Докупить
                         </button>

@@ -194,7 +194,7 @@ export function DetailClient({ item }: { item: CatalogItem }) {
                 className="inline-flex items-center gap-1.5 rounded-full bg-clay px-4 py-2 text-sm font-semibold text-white shadow-card transition-colors hover:bg-clay/90"
               >
                 <Hammer aria-hidden className="h-4 w-4" />
-                Режим мастера
+                Начать
               </button>
             )}
             <button
