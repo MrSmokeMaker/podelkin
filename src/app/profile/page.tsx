@@ -6,8 +6,6 @@ import {
   Hammer,
   Heart,
   Layers,
-  Lightbulb,
-  PenLine,
   Settings,
   Sparkles,
 } from "lucide-react";
@@ -17,20 +15,8 @@ import { ProfileCard } from "./_components/profile-card";
 export const metadata: Metadata = {
   title: "Профиль",
   description:
-    "Ваш профиль в мастерской: быстрые действия, настройки и прогресс.",
+    "Ваш профиль в мастерской: тариф, настройки и прогресс.",
 };
-
-/* «Действия» — три главных сценария из брифа, больше ничего лишнего. */
-const actions = [
-  { href: "/catalog", label: "Найти идею", icon: Lightbulb },
-  { href: "/generate?tab=manual", label: "Записать поделку", icon: PenLine },
-  { href: "/inventory", label: "Проверить запасы", icon: Boxes },
-];
-
-const secondaryLinks = [
-  { href: "/podelki/favorites", label: "Избранное", icon: Heart },
-  { href: "/boards", label: "Папки с идеями", icon: Layers },
-];
 
 /* Тариф, экспорт и статистика живут на отдельной странице /settings. */
 
@@ -76,7 +62,7 @@ export default function ProfilePage() {
       <header>
         <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Профиль</h1>
         <p className="mt-1 text-sm text-ink-soft">
-          Действия, тариф и прогресс мастерской
+          Тариф, настройки и прогресс мастерской
         </p>
       </header>
 
@@ -98,42 +84,6 @@ export default function ProfilePage() {
               <p className="mt-3 text-2xl font-bold leading-none">{value}</p>
               <p className="mt-1.5 text-xs font-medium text-ink-soft">{label}</p>
             </div>
-          ))}
-        </div>
-      </section>
-
-      <section aria-label="Действия">
-        <h2 className="text-lg font-bold">Действия</h2>
-        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
-          {actions.map(({ href, label, icon: Icon }) => (
-            <Link
-              key={href}
-              href={href}
-              className="group flex items-center gap-3 rounded-2xl bg-white p-4 shadow-card ring-1 ring-ink/5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-soft active:translate-y-0"
-            >
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-clay-soft text-[#8A4A2C]">
-                <Icon className="h-5 w-5" aria-hidden />
-              </span>
-              <span className="min-w-0 flex-1 truncate text-sm font-semibold">
-                {label}
-              </span>
-              <ArrowRight
-                className="h-4 w-4 shrink-0 text-ink-soft transition group-hover:translate-x-1"
-                aria-hidden
-              />
-            </Link>
-          ))}
-        </div>
-        <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2">
-          {secondaryLinks.map(({ href, label, icon: Icon }) => (
-            <Link
-              key={href}
-              href={href}
-              className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#8A4A2C] hover:underline"
-            >
-              <Icon className="h-4 w-4" aria-hidden />
-              {label}
-            </Link>
           ))}
         </div>
       </section>
