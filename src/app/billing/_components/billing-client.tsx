@@ -17,6 +17,9 @@ import { useFeatureFlags } from "@/hooks/use-feature-flags";
 import {
   PLAN_LABELS,
   PLAN_PRICES,
+  WEEKLY_CRAFTS,
+  WEEKLY_PRICES,
+  type PlanPeriod,
   type Role,
 } from "@/lib/feature-flags";
 
@@ -50,6 +53,7 @@ const PLANS: PlanInfo[] = [
       "Расширенная аналитика мастерской",
       "Экспорт .csv: время и стоимость по шагам",
       "Офлайн-доступ и приоритетная поддержка",
+      `Еженедельная подписка — ${WEEKLY_CRAFTS} поделок в неделю`,
     ],
   },
   {
@@ -62,6 +66,7 @@ const PLANS: PlanInfo[] = [
       "Аналитика ИИ: вызовы, кэш, рендеры",
       "Полный бэкап мастерской .json",
       "Контроль seed картинок и всё из Премиума",
+      `Еженедельная подписка — ${WEEKLY_CRAFTS} поделок в неделю`,
     ],
   },
 ];
@@ -73,7 +78,20 @@ export function BillingClient() {
   const showToast = useToast();
   const { user, loading } = useSession();
   const { role: currentRole } = useFeatureFlags();
-  const [checkoutPlan, setCheckoutPlan] = useState<Role | null>(null);
+  const [checkout, setCheckout] = useState<{
+    plan: Role;
+    period: PlanPeriod;
+  } | null>(null);
+  const weeklyPlans: { role: "premium" | "director"; note: string }[] = [
+    {
+      role: "premium",
+      note: "Все возможности Премиума на 7 дней",
+    },
+    {
+      role: "director",
+      note: "Все возможности Директора на 7 дней",
+    },
+  ];
 
   return (
     <div className="space-y-6">
@@ -153,7 +171,7 @@ export function BillingClient() {
               <button
                 type="button"
                 disabled={isCurrent || !user}
-                onClick={() => setCheckoutPlan(plan.role)}
+                onClick={() => setCheckout({ plan: plan.role, period: "month" })}
                 className={`mt-4 flex min-h-12 items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold transition active:scale-[0.98] disabled:cursor-not-allowed ${
                   isCurrent
                     ? "bg-ink/10 text-ink-soft"
@@ -175,6 +193,74 @@ export function BillingClient() {
         })}
       </div>
 
+      <section aria-label="Еженедельная подписка">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="text-lg font-bold">Еженедельная подписка</h2>
+          <p className="text-xs text-ink-soft">
+            короткий формат для Премиума и Директора — без месячных обязательств
+          </p>
+        </div>
+        <div className="mt-3 grid gap-4 md:grid-cols-2">
+          {weeklyPlans.map(({ role, note }) => {
+            const isCurrent = role === currentRole;
+            return (
+              <section
+                key={role}
+                aria-label={`${PLAN_LABELS[role]} на неделю`}
+                className="flex flex-col rounded-2xl bg-white p-5 shadow-card ring-1 ring-ink/5"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <h3 className="text-base font-bold">
+                    {PLAN_LABELS[role]}
+                    <span className="text-ink-soft"> · неделя</span>
+                  </h3>
+                  <span className="rounded-full bg-mist-soft px-2.5 py-1 text-[11px] font-bold text-[#4A6D8C]">
+                    7 дней
+                  </span>
+                </div>
+                <p className="mt-1 text-sm font-medium text-ink-soft">{note}</p>
+                <p className="mt-3 text-2xl font-bold">
+                  {WEEKLY_PRICES[role]} ₽
+                  <span className="text-sm font-medium text-ink-soft"> / неделя</span>
+                </p>
+                <ul className="mt-4 flex-1 space-y-2.5">
+                  <li className="flex items-start gap-2 text-sm">
+                    <Sparkles
+                      className="mt-0.5 h-4 w-4 shrink-0 text-clay"
+                      aria-hidden
+                    />
+                    <span>
+                      <b>{WEEKLY_CRAFTS} поделок в неделю</b> — пакет ИИ-генераций
+                    </span>
+                  </li>
+                  <li className="flex items-start gap-2 text-sm">
+                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-[#55693F]" aria-hidden />
+                    <span>Все возможности тарифа {PLAN_LABELS[role]} на неделю</span>
+                  </li>
+                  <li className="flex items-start gap-2 text-sm">
+                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-[#55693F]" aria-hidden />
+                    <span>Подключается отдельно — можно к любому тарифу</span>
+                  </li>
+                </ul>
+                <button
+                  type="button"
+                  disabled={!user}
+                  onClick={() => setCheckout({ plan: role, period: "week" })}
+                  className="mt-4 flex min-h-12 items-center justify-center gap-2 rounded-xl bg-clay px-5 py-3 text-sm font-semibold text-paper shadow-card transition hover:bg-[#B06A48] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {user ? "Подключить на неделю" : "Требуется вход"}
+                </button>
+                {isCurrent && (
+                  <p className="mt-2 text-center text-[11px] font-medium text-ink-soft">
+                    Это ваш тариф — неделя добавит пакет {WEEKLY_CRAFTS} поделок
+                  </p>
+                )}
+              </section>
+            );
+          })}
+        </div>
+      </section>
+
       {!loading && user && user.payments.length > 0 && (
         <section
           aria-label="История платежей"
@@ -188,7 +274,8 @@ export function BillingClient() {
                 className="flex flex-wrap items-center justify-between gap-2 py-3 text-sm"
               >
                 <span className="font-semibold">
-                  {PLAN_LABELS[payment.plan]} · {payment.amount} ₽
+                  {PLAN_LABELS[payment.plan]}
+                  {payment.period === "week" ? " · неделя" : ""} · {payment.amount} ₽
                 </span>
                 <span className="text-xs text-ink-soft">
                   Карта ••{payment.cardLast4} ·{" "}
@@ -220,13 +307,19 @@ export function BillingClient() {
         Данные карты не сохраняются — только последние 4 цифры для истории.
       </p>
 
-      {checkoutPlan && (
+      {checkout && (
         <CheckoutModal
-          plan={checkoutPlan}
-          onClose={() => setCheckoutPlan(null)}
+          plan={checkout.plan}
+          period={checkout.period}
+          onClose={() => setCheckout(null)}
           onDone={(label) => {
-            setCheckoutPlan(null);
-            showToast("Тариф обновлён", `Активен тариф «${label}»`);
+            setCheckout(null);
+            showToast(
+              checkout.period === "week" ? "Подписка активна" : "Тариф обновлён",
+              checkout.period === "week"
+                ? `«${label}» на неделю: ${WEEKLY_CRAFTS} поделок`
+                : `Активен тариф «${label}»`
+            );
             router.refresh();
           }}
         />
@@ -237,16 +330,19 @@ export function BillingClient() {
 
 function CheckoutModal({
   plan,
+  period,
   onClose,
   onDone,
 }: {
   plan: Role;
+  period: PlanPeriod;
   onClose: () => void;
   onDone: (label: string) => void;
 }) {
   const { refresh } = useSession();
-  const price = PLAN_PRICES[plan];
-  const isFree = price === 0;
+  const price = period === "week" ? WEEKLY_PRICES[plan] : PLAN_PRICES[plan];
+  const isFree = period === "month" && price === 0;
+  const periodLabel = period === "week" ? "неделя" : "меся";
   const [number, setNumber] = useState("");
   const [expiry, setExpiry] = useState("");
   const [cvc, setCvc] = useState("");
@@ -267,6 +363,7 @@ function CheckoutModal({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           plan,
+          period,
           card: isFree ? undefined : { number, expiry, cvc, holder },
         }),
       });
@@ -288,7 +385,11 @@ function CheckoutModal({
     <div
       role="dialog"
       aria-modal="true"
-      aria-label={isFree ? "Смена тарифа" : `Оплата тарифа ${PLAN_LABELS[plan]}`}
+      aria-label={
+        isFree
+          ? "Смена тарифа"
+          : `Оплата — ${PLAN_LABELS[plan]}${period === "week" ? " (неделя)" : ""}`
+      }
       className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-0 backdrop-blur-sm sm:items-center sm:p-4"
       onClick={onClose}
     >
@@ -299,12 +400,16 @@ function CheckoutModal({
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 className="text-lg font-bold">
-              {isFree ? "Смена тарифа" : `Оплата — ${PLAN_LABELS[plan]}`}
+              {isFree
+                ? "Смена тарифа"
+                : `Оплата — ${PLAN_LABELS[plan]}${period === "week" ? " · неделя" : ""}`}
             </h2>
             <p className="mt-1 text-sm text-ink-soft">
               {isFree
                 ? "Тариф «Базовый» бесплатный: лимиты вернутся к базовым."
-                : `${price} ₽ / месяц · тариф «${PLAN_LABELS[plan]}»`}
+                : period === "week"
+                  ? `${price} ₽ / неделя · пакет ${WEEKLY_CRAFTS} поделок в неделю`
+                  : `${price} ₽ / месяц · тариф «${PLAN_LABELS[plan]}»`}
             </p>
           </div>
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sage-soft text-[#55693F]">

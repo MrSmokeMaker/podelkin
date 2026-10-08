@@ -14,6 +14,7 @@ import {
   PLAN_PRICES,
   PROJECT_LIMITS,
   ROLES,
+  WEEKLY_CRAFTS,
   formatLimit,
   type Role,
 } from "@/lib/feature-flags";
@@ -50,6 +51,14 @@ const TABLE_ROWS: { label: string; values: Record<Role, string> }[] = [
   {
     label: "Экспорт",
     values: { basic: "TXT", premium: "+ CSV", director: "+ JSON" },
+  },
+  {
+    label: "Подписка на поделки",
+    values: {
+      basic: "—",
+      premium: `${WEEKLY_CRAFTS} в неделю`,
+      director: `${WEEKLY_CRAFTS} в неделю`,
+    },
   },
   {
     label: "Аналитика",

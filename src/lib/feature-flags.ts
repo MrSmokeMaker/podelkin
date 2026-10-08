@@ -74,6 +74,18 @@ export const PLAN_PRICES: Record<Role, number> = {
   director: 990,
 };
 
+/* Еженедельная подписка: короткий формат для платных тарифов —
+   15 поделок (ИИ-генераций) в неделю, оплата раз в неделю. */
+export type PlanPeriod = "month" | "week";
+
+export const WEEKLY_CRAFTS = 15;
+
+export const WEEKLY_PRICES: Record<Role, number> = {
+  basic: 0,
+  premium: 99,
+  director: 249,
+};
+
 /* Порядок тарифов для сравнения «апгрейд или даунгрейд». */
 export const PLAN_RANK: Record<Role, number> = { basic: 0, premium: 1, director: 2 };
 

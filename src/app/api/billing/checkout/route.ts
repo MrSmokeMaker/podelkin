@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { PLAN_PRICES, ROLES, type Role } from "@/lib/feature-flags";
+import { PLAN_PRICES, ROLES, WEEKLY_PRICES, type PlanPeriod, type Role } from "@/lib/feature-flags";
 import {
   SESSION_COOKIE,
   addPayment,
@@ -11,7 +11,8 @@ import {
 
 export const dynamic = "force-dynamic";
 
-/* Демо-оплата тарифа. Карта не сохраняется — только последние 4 цифры.
+/* Демо-оплата тарифа: месяц или еженедельная подписка (Премиум/Директор).
+   Карта не сохраняется — только последние 4 цифры.
    Успешная карта: 4242 4242 4242 4242; номер на «0000» имитирует отказ банка.
    Смена на «Базовый» проходит без карты (отмена подписки). */
 export async function POST(request: NextRequest) {
@@ -31,8 +32,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Ожидается JSON" }, { status: 400 });
   }
 
-  const { plan, card } = (body ?? {}) as {
+  const { plan, period, card } = (body ?? {}) as {
     plan?: unknown;
+    period?: unknown;
     card?: {
       number?: unknown;
       expiry?: unknown;
@@ -46,14 +48,26 @@ export async function POST(request: NextRequest) {
   }
   const target = plan as Role;
 
-  if (target === current.plan) {
+  /* Неделя — отдельный формат только для платных тарифов: можно подключать
+     и к уже активному тарифу (это пакет, а не смена плана). */
+  const billingPeriod: PlanPeriod = period === "week" ? "week" : "month";
+
+  if (billingPeriod === "week" && target === "basic") {
+    return NextResponse.json(
+      { error: "Недельная подписка доступна в Премиуме и Директоре" },
+      { status: 400 }
+    );
+  }
+
+  if (target === current.plan && billingPeriod === "month") {
     return NextResponse.json(
       { error: "Этот тариф уже активен" },
       { status: 409 }
     );
   }
 
-  const amount = PLAN_PRICES[target];
+  const amount =
+    billingPeriod === "week" ? WEEKLY_PRICES[target] : PLAN_PRICES[target];
 
   if (amount > 0) {
     const result = chargeCard({
@@ -74,6 +88,7 @@ export async function POST(request: NextRequest) {
         status: "declined",
         cardLast4: last4,
         createdAt: new Date().toISOString(),
+        period: billingPeriod,
       });
       return NextResponse.json({ error: result.reason }, { status: 402 });
     }
@@ -84,6 +99,7 @@ export async function POST(request: NextRequest) {
       status: "paid",
       cardLast4: last4,
       createdAt: new Date().toISOString(),
+      period: billingPeriod,
     });
   }
 

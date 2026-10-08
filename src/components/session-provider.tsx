@@ -9,7 +9,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import type { Role } from "@/lib/feature-flags";
+import type { PlanPeriod, Role } from "@/lib/feature-flags";
 
 export interface SessionPayment {
   id: string;
@@ -18,6 +18,7 @@ export interface SessionPayment {
   status: "paid" | "declined";
   cardLast4: string;
   createdAt: string;
+  period?: PlanPeriod;
 }
 
 export interface SessionUser {

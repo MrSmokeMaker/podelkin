@@ -1,5 +1,5 @@
 import { randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
-import { PLAN_RANK, type Role } from "@/lib/feature-flags";
+import { PLAN_RANK, type PlanPeriod, type Role } from "@/lib/feature-flags";
 
 /* Пользователи и сессии в памяти: как и весь слой данных приложения,
    заменяют PostgreSQL + Prisma в среде без сети. Пароли — scrypt,
@@ -12,6 +12,7 @@ export interface PaymentRecord {
   status: "paid" | "declined";
   cardLast4: string;
   createdAt: string;
+  period?: PlanPeriod;
 }
 
 export interface StoredUser {
