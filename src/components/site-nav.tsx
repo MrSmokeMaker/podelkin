@@ -12,6 +12,7 @@ import {
   Scissors,
   Shapes,
   Sparkles,
+  UserRound,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -22,12 +23,14 @@ const links = [
   { href: "/boards", label: "Доски", icon: Layers },
   { href: "/export", label: "Экспорт", icon: Download },
   { href: "/stats", label: "Статистика", icon: ChartPie },
+  { href: "/profile", label: "Профиль", icon: UserRound },
 ];
 
 const mobileLinks = [
   { href: "/catalog", label: "Каталог", icon: LayoutGrid },
   { href: "/build", label: "Мастер", icon: Scissors },
   { href: "/inventory", label: "Запасы", icon: Boxes },
+  { href: "/profile", label: "Профиль", icon: UserRound },
 ];
 
 function isActive(pathname: string, href: string) {
@@ -132,7 +135,7 @@ export function BottomNav() {
       aria-label="Основная (мобильная)"
       className="fixed inset-x-0 bottom-0 z-40 border-t border-ink/10 bg-paper/95 pb-[env(safe-area-inset-bottom)] shadow-soft backdrop-blur md:hidden"
     >
-      <div className="grid grid-cols-4">
+      <div className="grid grid-cols-5">
         {mobileLinks.slice(0, 2).map(renderLink)}
         <Link
           href="/generate"
