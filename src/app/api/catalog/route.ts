@@ -4,6 +4,10 @@ import path from "node:path";
 import { parseSourceUrl } from "@/server/services/sourceFetcher";
 import { importCraftFromSource } from "@/server/services/sourceImport";
 import {
+  isBulkImporting,
+  startBulkImportIfNeeded,
+} from "@/server/services/sourceBulk";
+import {
   catalogItems,
   createCatalogItem,
   CATALOG_CATEGORIES,
@@ -25,7 +29,14 @@ const THUMB_EXT: Record<string, string> = {
 const MAX_THUMB_BYTES = 5 * 1024 * 1024;
 
 export function GET() {
-  return NextResponse.json({ total: catalogItems.length, items: catalogItems });
+  // Первый запрос каталога запускает фоновую автозагрузку из источников;
+  // importing говорит клиенту, что список стоит обновить чуть позже.
+  startBulkImportIfNeeded();
+  return NextResponse.json({
+    total: catalogItems.length,
+    items: catalogItems,
+    importing: isBulkImporting(),
+  });
 }
 
 function isHttpUrl(value: string): boolean {

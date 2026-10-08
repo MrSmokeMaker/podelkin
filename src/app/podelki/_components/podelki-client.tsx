@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Clock, Loader2, Plus, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -149,36 +149,53 @@ export function PodelkiClient() {
   const [source, setSource] = useState<string | null>(null);
   const [sort, setSort] = useState<SortKey>("new");
   const [offline, setOffline] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [pollTick, setPollTick] = useState(0);
+
+  const loadCatalog = useCallback(async () => {
+    try {
+      const response = await fetch("/api/catalog");
+      if (!response.ok) throw new Error(String(response.status));
+      const data = (await response.json()) as {
+        items: CatalogItem[];
+        importing?: boolean;
+      };
+      setItems(data.items);
+      setOffline(false);
+      setImporting(Boolean(data.importing));
+      setStatus("ready");
+      await saveCatalogOffline(data.items).catch(() => {});
+    } catch {
+      const saved = await loadCatalogOffline<CatalogItem[]>().catch(() => null);
+      setImporting(false);
+      if (saved && saved.length > 0) {
+        setItems(saved);
+        setOffline(true);
+        setStatus("ready");
+      } else {
+        setStatus("error");
+      }
+    }
+  }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    fetch("/api/catalog")
-      .then((response) => {
-        if (!response.ok) throw new Error(String(response.status));
-        return response.json() as Promise<{ items: CatalogItem[] }>;
-      })
-      .then(async (data) => {
-        if (cancelled) return;
-        setItems(data.items);
-        setOffline(false);
-        setStatus("ready");
-        await saveCatalogOffline(data.items).catch(() => {});
-      })
-      .catch(async () => {
-        const saved = await loadCatalogOffline<CatalogItem[]>().catch(() => null);
-        if (cancelled) return;
-        if (saved && saved.length > 0) {
-          setItems(saved);
-          setOffline(true);
-          setStatus("ready");
-        } else {
-          setStatus("error");
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    void loadCatalog();
+  }, [loadCatalog]);
+
+  /* Пока на сервере идёт фоновая автозагрузка, раз в 15 секунд
+     обновляем список — не дольше 3 минут. */
+  useEffect(() => {
+    if (!importing) return;
+    if (pollTick >= 12) {
+      setImporting(false);
+      return;
+    }
+    const timer = setTimeout(() => {
+      setPollTick((tick) => tick + 1);
+      void loadCatalog();
+    }, 15_000);
+    return () => clearTimeout(timer);
+  }, [importing, pollTick, loadCatalog]);
 
   const filtered = useMemo(() => {
     const lowerQuery = query.trim().toLowerCase();
@@ -283,6 +300,13 @@ export function PodelkiClient() {
       {offline && status === "ready" && (
         <p className="rounded-2xl bg-sand-soft px-4 py-3 text-sm text-ink ring-1 ring-sand/40">
           Офлайн: показан сохранённый каталог с устройства.
+        </p>
+      )}
+
+      {importing && status === "ready" && (
+        <p className="flex items-center gap-2 rounded-2xl bg-mist-soft px-4 py-3 text-sm text-ink ring-1 ring-ink/5">
+          <Loader2 aria-hidden className="h-4 w-4 animate-spin" />
+          Импортируем поделки из источников — новые записи появятся здесь автоматически.
         </p>
       )}
 

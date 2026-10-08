@@ -1,4 +1,4 @@
-const CACHE = "rukodelie-v3";
+const CACHE = "rukodelie-v4";
 const CORE = [
   "/",
   "/catalog",
@@ -28,27 +28,47 @@ self.addEventListener("activate", (event) => {
   );
 });
 
-/* Все GET — cache-first с обновлением из сети; POST/PUT в кэш не попадают. */
+/* Страницы, картинки и прочие GET — cache-first с обновлением из сети.
+   Каталог (/api/catalog) — network-first: фоновая автозагрузка постоянно
+   пополняет список, а при отсутствии сети показываем сохранённую копию. */
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   if (request.method !== "GET" || new URL(request.url).origin !== self.location.origin) {
     return;
   }
-  event.respondWith(
-    caches.match(request).then((cached) => {
-      const network = fetch(request)
-        .then((response) => {
-          if (response.ok) {
-            const copy = response.clone();
-            caches.open(CACHE).then((cache) => cache.put(request, copy));
-          }
-          return response;
-        })
-        .catch(() => cached);
-      return cached || network;
-    })
-  );
+  if (new URL(request.url).pathname === "/api/catalog") {
+    event.respondWith(networkFirst(request));
+    return;
+  }
+  event.respondWith(cacheFirst(request));
 });
+
+async function cacheFirst(request) {
+  const cached = await caches.match(request);
+  const network = fetch(request)
+    .then((response) => {
+      if (response.ok) {
+        const copy = response.clone();
+        caches.open(CACHE).then((cache) => cache.put(request, copy));
+      }
+      return response;
+    })
+    .catch(() => cached);
+  return cached || network;
+}
+
+async function networkFirst(request) {
+  const cache = await caches.open(CACHE);
+  try {
+    const response = await fetch(request);
+    if (response.ok) await cache.put(request, response.clone());
+    return response;
+  } catch {
+    const cached = await cache.match(request);
+    if (cached) return cached;
+    return new Response("", { status: 503 });
+  }
+}
 
 /* Offline sync: mock-сигнал premium от страницы
    ({ type: "RUKODELIE_SYNC", premium: true }).
