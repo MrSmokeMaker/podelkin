@@ -79,7 +79,7 @@ export function BottomNav() {
   return (
     <nav
       aria-label="Основная (мобильная)"
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-ink/10 bg-paper/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-ink/10 bg-paper/95 pb-[env(safe-area-inset-bottom)] shadow-soft backdrop-blur md:hidden"
     >
       <div className="grid grid-cols-5">
         {mobileLinks.map(({ href, label, icon: Icon }) => {
@@ -93,15 +93,23 @@ export function BottomNav() {
             <Link
               key={href}
               href={href}
+              aria-current={active ? "page" : undefined}
               className={cn(
-                "flex min-h-[3.75rem] flex-col items-center justify-center gap-1 text-[11px] font-medium transition-colors",
+                "flex min-h-16 flex-col items-center justify-center gap-1 text-[11px] font-semibold transition-colors active:scale-[0.97]",
                 active ? "text-[#8A4A2C]" : "text-ink-soft"
               )}
             >
-              <Icon
-                className={cn("h-5 w-5", active && "text-clay")}
-                strokeWidth={active ? 2.4 : 2}
-              />
+              <span
+                className={cn(
+                  "flex h-9 w-14 items-center justify-center rounded-2xl transition-shadow",
+                  active ? "bg-clay-soft shadow-card" : "bg-transparent"
+                )}
+              >
+                <Icon
+                  className={cn("h-6 w-6", active && "text-clay")}
+                  strokeWidth={active ? 2.6 : 2}
+                />
+              </span>
               {label}
             </Link>
           );
