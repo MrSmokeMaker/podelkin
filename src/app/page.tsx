@@ -38,25 +38,6 @@ export default function HomePage() {
             Статистика мастерской
           </Link>
         </div>
-        <dl className="mt-8 grid grid-cols-3 gap-3 text-center sm:max-w-md sm:gap-6">
-          {[
-            { dt: "Мастер-классов", dd: String(crafts.length) },
-            { dt: "Для новичков", dd: String(easy) },
-            {
-              dt: "Средний чек",
-              dd: formatRub(
-                crafts.reduce((s, c) => s + craftCost(c), 0) / crafts.length
-              ),
-            },
-          ].map((stat) => (
-            <div key={stat.dt} className="rounded-2xl bg-white/70 p-3">
-              <dt className="text-[11px] font-medium text-ink-soft">
-                {stat.dt}
-              </dt>
-              <dd className="text-lg font-bold sm:text-xl">{stat.dd}</dd>
-            </div>
-          ))}
-        </dl>
         </div>
         <div className="relative min-h-56 sm:min-h-72 lg:min-h-0">
           <img
@@ -122,6 +103,23 @@ export default function HomePage() {
           </span>
         </div>
       </section>
+
+      {/* Коротко о мастерской: цифры одной строкой внизу, вместо крупных карточек в хиро */}
+      <footer
+        aria-label="Коротко о мастерской"
+        className="flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-ink/10 pt-4 text-sm text-ink-soft"
+      >
+        <span className="font-semibold text-ink">{crafts.length}</span> мастер-классов
+        <span aria-hidden>·</span>
+        <span className="font-semibold text-ink">{easy}</span> для новичков
+        <span aria-hidden>·</span>
+        средний чек
+        <span className="font-semibold text-ink">
+          {formatRub(
+            crafts.reduce((s, c) => s + craftCost(c), 0) / crafts.length
+          )}
+        </span>
+      </footer>
     </div>
   );
 }
