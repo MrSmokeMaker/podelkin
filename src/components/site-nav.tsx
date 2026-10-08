@@ -27,11 +27,12 @@ const links = [
   { href: "/profile", label: "Профиль", icon: UserRound },
 ];
 
+/* Нижняя панель симметрична: 2 ссылки слева, «+» в центре, 2 справа.
+   Настройки — в верхнем меню и на странице Профиля. */
 const mobileLinks = [
   { href: "/catalog", label: "Каталог", icon: LayoutGrid },
   { href: "/inventory", label: "Запасы", icon: Boxes },
   { href: "/shopping-list", label: "Покупки", icon: ShoppingCart },
-  { href: "/settings", label: "Настройки", icon: Settings },
   { href: "/profile", label: "Профиль", icon: UserRound },
 ];
 
@@ -140,8 +141,8 @@ export function BottomNav() {
       aria-label="Основная (мобильная)"
       className="fixed inset-x-0 bottom-0 z-40 border-t border-ink/10 bg-paper/95 pb-[env(safe-area-inset-bottom)] shadow-soft backdrop-blur md:hidden"
     >
-      <div className="grid grid-cols-6">
-        {mobileLinks.slice(0, 1).map(renderLink)}
+      <div className="grid grid-cols-5">
+        {mobileLinks.slice(0, 2).map(renderLink)}
         <Link
           href="/generate"
           aria-label="Сгенерировать поделку"
