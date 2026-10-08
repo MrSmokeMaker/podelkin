@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getAuthUser } from "@/lib/auth";
 import { aiStats } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -8,7 +9,19 @@ export const dynamic = "force-dynamic";
    попавших в кэш повторных вызовов провайдер не видит). */
 const DEFAULT_IMAGE_QUOTA = 2000;
 
-export async function GET() {
+/* Аналитика ИИ-контура — возможность «Директора» (aiInsights). */
+export async function GET(request: Request) {
+  const user = getAuthUser(request);
+  if (!user.features.allowed.includes("aiInsights")) {
+    return NextResponse.json(
+      {
+        error:
+          "Аналитика генераций доступна на тарифе «Директор».",
+      },
+      { status: 403 }
+    );
+  }
+
   const { llmCalls, imageRenders, cacheHits, cacheMisses } = aiStats;
   const denominator = cacheHits + cacheMisses;
 

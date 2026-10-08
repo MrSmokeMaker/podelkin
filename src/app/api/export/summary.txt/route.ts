@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAuthUser } from "@/lib/auth";
+import { PLAN_LABELS } from "@/lib/feature-flags";
 import { boards, crafts, inventory, projects } from "@/lib/db";
 import { collectCost } from "@/lib/cost-calculator";
 import { craftMinutes, formatMinutes, formatRub } from "@/lib/crafts";
@@ -36,7 +37,7 @@ export function GET(request: Request) {
   const lines = [
     "Podelkin — сводка мастерской",
     `Сгенерировано: ${new Date().toLocaleString("ru-RU")}`,
-    `Тариф: ${user.role}`,
+    `Тариф: ${PLAN_LABELS[user.role]}`,
     "",
     "МАСТЕР-КЛАССЫ",
     `Всего: ${totalCrafts}`,
@@ -55,8 +56,8 @@ export function GET(request: Request) {
     `ДОСКИ: ${boards.length}`,
     "",
     "—",
-    "Базовая сводка бесплатного тарифа.",
-    "Расширенная аналитика и экспорт .csv — на тарифе Premium.",
+    "Базовая сводка тарифа «Базовый».",
+    "Расширенная аналитика и экспорт .csv — в тарифе «Премиум».",
   ];
 
   return new Response(lines.join("\n"), {

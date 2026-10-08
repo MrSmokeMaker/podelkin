@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthUser } from "@/lib/auth";
+import { PLAN_LABELS } from "@/lib/feature-flags";
 import {
   countGenerationsToday,
   createAiDraft,
@@ -23,12 +24,15 @@ const MAX_SOURCE_TEXT = 120_000;
 
 export async function POST(request: NextRequest) {
   const user = getAuthUser(request);
-  const perDay = Number(process.env.GEN_PER_USER_PER_DAY) || 5;
+  // Квота зависит от тарифа, но генерация доступна всем — и гостям тоже.
+  const perDay = user.generationLimit;
 
   // Лимит проверяем ДО обращения к ИИ — платные вызовы не тратятся впустую.
   if (countGenerationsToday(user.id) >= perDay) {
     return NextResponse.json(
-      { error: "Лимит генераций на сегодня исчерпан" },
+      {
+        error: `Дневной лимит генераций тарифа «${PLAN_LABELS[user.role]}» исчерпан (${perDay}/день). Оформите тариф выше, чтобы генерировать больше.`,
+      },
       { status: 429 }
     );
   }

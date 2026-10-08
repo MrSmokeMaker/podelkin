@@ -1,38 +1,44 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, Heart, Pencil, Smartphone, X } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { Check, CreditCard, Heart, LogOut, Pencil, X } from "lucide-react";
+import { useSession } from "@/components/session-provider";
+import { useToast } from "@/components/toast";
 import { useFeatureFlags } from "@/hooks/use-feature-flags";
+import { PLAN_LABELS, PLAN_PRICES, formatLimit } from "@/lib/feature-flags";
 import { readFavoriteIds } from "@/lib/favorites";
-import type { Role } from "@/lib/feature-flags";
-
-const PLAN_LABEL: Record<Role, string> = {
-  free: "Базовый",
-  premium: "Premium",
-  admin: "Админ",
-};
 
 /* Три пункта из брифа — ровно то, что обещаем в модалке. */
 const PREMIUM_PERKS = [
-  "Сохранение проектов на устройство",
-  "Расширенная аналитика запасов",
-  "Экспорт в CSV",
+  "Генерация с ИИ — 15 в день вместо 3",
+  "10 проектов и 20 коллекций одновременно",
+  "Расширенная аналитика и экспорт .csv",
 ];
 
 const NAME_STORAGE_KEY = "rukodelie-profile-name";
 
 export function ProfileCard() {
+  const router = useRouter();
+  const showToast = useToast();
+  const { user, refresh } = useSession();
   const { role, boardLimit } = useFeatureFlags();
   const [name, setName] = useState("Гость мастерской");
   const [favorites, setFavorites] = useState(0);
   const [editing, setEditing] = useState(false);
   const [showPerks, setShowPerks] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   useEffect(() => {
-    const stored = window.localStorage.getItem(NAME_STORAGE_KEY);
-    if (stored) setName(stored);
+    if (user) {
+      setName(user.name);
+    } else {
+      const stored = window.localStorage.getItem(NAME_STORAGE_KEY);
+      if (stored) setName(stored);
+    }
     setFavorites(readFavoriteIds().length);
-  }, []);
+  }, [user]);
 
   const initials =
     name
@@ -50,6 +56,19 @@ export function ProfileCard() {
       /* приватный режим — имя просто не сохранится */
     }
   };
+
+  async function logout() {
+    setLoggingOut(true);
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+      await refresh();
+      showToast("Вы вышли из аккаунта", "Данные мастерской остаются на устройстве");
+      router.push("/");
+      router.refresh();
+    } finally {
+      setLoggingOut(false);
+    }
+  }
 
   return (
     <section className="rounded-2xl bg-white p-5 shadow-card ring-1 ring-ink/5 sm:p-6">
@@ -89,57 +108,98 @@ export function ProfileCard() {
           ) : (
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
               <p className="truncate text-xl font-bold">{name}</p>
-              <button
-                type="button"
-                onClick={() => setEditing(true)}
-                className="inline-flex min-h-8 items-center gap-1.5 rounded-full bg-paper-deep/70 px-3 text-xs font-semibold text-ink-soft transition-colors hover:text-ink active:scale-95"
-              >
-                <Pencil className="h-3.5 w-3.5" aria-hidden />
-                Изменить имя
-              </button>
+              {!user && (
+                <button
+                  type="button"
+                  onClick={() => setEditing(true)}
+                  className="inline-flex min-h-8 items-center gap-1.5 rounded-full bg-paper-deep/70 px-3 text-xs font-semibold text-ink-soft transition-colors hover:text-ink active:scale-95"
+                >
+                  <Pencil className="h-3.5 w-3.5" aria-hidden />
+                  Изменить имя
+                </button>
+              )}
             </div>
           )}
-          <p className="mt-1 text-xs text-ink-soft">
-            Имя сохраняется на устройстве
+          <p className="mt-1 truncate text-xs text-ink-soft">
+            {user ? user.email : "Войдите, чтобы синхронизировать тариф и оплату"}
           </p>
         </div>
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2 text-xs font-semibold">
         <span className="inline-flex min-h-8 items-center rounded-full bg-clay-soft px-3 py-1.5 text-[#8A4A2C]">
-          Твой план: {PLAN_LABEL[role]}
+          Твой тариф: {PLAN_LABELS[role]}
         </span>
         <span className="inline-flex min-h-8 items-center gap-1.5 rounded-full bg-paper-deep/70 px-3 py-1.5">
           <Heart className="h-3.5 w-3.5 text-blush" aria-hidden />
           {favorites} в избранном
         </span>
         <span className="inline-flex min-h-8 items-center rounded-full bg-paper-deep/70 px-3 py-1.5">
-          Папок: до {boardLimit}
+          Коллекций: до {formatLimit(boardLimit)}
         </span>
       </div>
 
       <div className="mt-5 flex flex-col gap-3 border-t border-ink/10 pt-4 sm:flex-row">
-        <button
-          type="button"
-          onClick={() => setShowPerks(true)}
-          className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl border-2 border-clay bg-white px-5 py-3 text-sm font-semibold text-[#8A4A2C] transition hover:bg-clay-soft/40 active:scale-[0.98]"
-        >
-          Что я получу в Premium?
-        </button>
-        <a
-          href="/export"
-          className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-semibold text-ink ring-1 ring-ink/10 transition hover:bg-paper-deep active:scale-[0.98]"
-        >
-          <Smartphone className="h-4 w-4" aria-hidden />
-          Сохранить в телефон
-        </a>
+        {user ? (
+          <>
+            <Link
+              href="/billing"
+              className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-clay px-5 py-3 text-sm font-semibold text-paper shadow-card transition hover:bg-[#B06A48] active:scale-[0.98]"
+            >
+              <CreditCard className="h-4 w-4" aria-hidden />
+              Управлять тарифом
+            </Link>
+            <button
+              type="button"
+              onClick={logout}
+              disabled={loggingOut}
+              className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-semibold text-ink ring-1 ring-ink/10 transition hover:bg-paper-deep active:scale-[0.98] disabled:cursor-wait disabled:opacity-70"
+            >
+              <LogOut className="h-4 w-4" aria-hidden />
+              {loggingOut ? "Выходим…" : "Выйти"}
+            </button>
+          </>
+        ) : (
+          <>
+            <Link
+              href="/login"
+              className="flex min-h-12 flex-1 items-center justify-center rounded-xl bg-clay px-5 py-3 text-sm font-semibold text-paper shadow-card transition hover:bg-[#B06A48] active:scale-[0.98]"
+            >
+              Войти
+            </Link>
+            <Link
+              href="/register"
+              className="flex min-h-12 flex-1 items-center justify-center rounded-xl bg-white px-5 py-3 text-sm font-semibold text-ink ring-1 ring-ink/10 transition hover:bg-paper-deep active:scale-[0.98]"
+            >
+              Регистрация
+            </Link>
+          </>
+        )}
       </div>
+
+      {!user && (
+        <div className="mt-4 flex flex-col gap-3 border-t border-ink/10 pt-4 sm:flex-row">
+          <button
+            type="button"
+            onClick={() => setShowPerks(true)}
+            className="flex min-h-12 flex-1 items-center justify-center rounded-xl border-2 border-clay bg-white px-5 py-3 text-sm font-semibold text-[#8A4A2C] transition hover:bg-clay-soft/40 active:scale-[0.98]"
+          >
+            Что я получу в Премиуме?
+          </button>
+          <Link
+            href="/billing"
+            className="flex min-h-12 flex-1 items-center justify-center rounded-xl bg-white px-5 py-3 text-sm font-semibold text-ink ring-1 ring-ink/10 transition hover:bg-paper-deep active:scale-[0.98]"
+          >
+            Смотреть тарифы — от {PLAN_PRICES.premium} ₽/мес
+          </Link>
+        </div>
+      )}
 
       {showPerks && (
         <div
           role="dialog"
           aria-modal="true"
-          aria-label="Что даёт Premium"
+          aria-label="Что даёт Премиум"
           className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-4 sm:items-center"
           onClick={() => setShowPerks(false)}
         >
@@ -148,7 +208,7 @@ export function ProfileCard() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-3">
-              <h3 className="text-lg font-bold">Что даёт Premium</h3>
+              <h3 className="text-lg font-bold">Что даёт Премиум</h3>
               <button
                 type="button"
                 onClick={() => setShowPerks(false)}
@@ -171,13 +231,12 @@ export function ProfileCard() {
                 </li>
               ))}
             </ul>
-            <button
-              type="button"
-              onClick={() => setShowPerks(false)}
-              className="mt-5 min-h-11 w-full rounded-xl bg-clay px-5 py-2.5 text-sm font-semibold text-paper shadow-card transition hover:bg-[#B06A48] active:scale-[0.98]"
+            <Link
+              href="/billing"
+              className="mt-5 flex min-h-11 w-full items-center justify-center rounded-xl bg-clay px-5 py-2.5 text-sm font-semibold text-paper shadow-card transition hover:bg-[#B06A48] active:scale-[0.98]"
             >
-              Понятно
-            </button>
+              Смотреть тарифы
+            </Link>
           </div>
         </div>
       )}

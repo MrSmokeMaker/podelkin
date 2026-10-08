@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { getAuthUser } from "@/lib/auth";
+import { PLAN_LABELS } from "@/lib/feature-flags";
 import { boards, crafts } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
-/* Доски настроения. Лимиты по тарифу: free — 3, premium/admin — 20. */
+/* Доски настроения. Лимиты по тарифу: Базовый — 3, Премиум — 20, Директор — 100. */
 
 export function GET(request: Request) {
   const user = getAuthUser(request);
@@ -44,9 +45,9 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         error:
-          user.role === "free"
-            ? `На бесплатном тарифе можно вести до ${user.boardLimit} досок. Оформите Premium, чтобы создавать до 20 досок.`
-            : `Достигнут лимит в ${user.boardLimit} досок для тарифа «${user.role}».`,
+          user.role === "basic"
+            ? `На тарифе «Базовый» можно вести до ${user.boardLimit} досок. Оформите Премиум — до 20, или Директор — до 100.`
+            : `Достигнут лимит в ${user.boardLimit} досок для тарифа «${PLAN_LABELS[user.role]}».`,
       },
       { status: 403 }
     );

@@ -6,6 +6,7 @@ import { PremiumBadge } from "@/components/premium-badge";
 import { useFeatureFlags } from "@/hooks/use-feature-flags";
 import type { Category } from "@/data/mockData";
 import { categoryColors, formatMinutes, formatRub } from "@/lib/crafts";
+import { PLAN_LABELS } from "@/lib/feature-flags";
 
 interface PremiumStats {
   costBreakdownByCategory: { category: string; cost: number }[];
@@ -22,12 +23,12 @@ const LOCKED_CARDS = [
 ];
 
 export function StatsAdvanced() {
-  const { has, role } = useFeatureFlags();
+  const { has } = useFeatureFlags();
   const [stats, setStats] = useState<PremiumStats | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    fetch(`/api/stats?role=${role}`)
+    fetch("/api/stats")
       .then((res) => res.json())
       .then((data) => {
         if (!cancelled && data?.costBreakdownByCategory) setStats(data);
@@ -36,7 +37,7 @@ export function StatsAdvanced() {
     return () => {
       cancelled = true;
     };
-  }, [role]);
+  }, []);
 
   if (!has("advancedStats")) {
     return (
@@ -46,7 +47,7 @@ export function StatsAdvanced() {
       >
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lg font-bold">Расширенная аналитика</h2>
-          <PremiumBadge tooltip="Разбивка по стоимости и времени, экономия и тренды материалов — на тарифе Premium" />
+          <PremiumBadge tooltip="Разбивка по стоимости и времени, экономия и тренды материалов — на тарифе Премиум" />
         </div>
         <p className="mt-2 text-sm text-ink-soft">
           Дополнительные разрезы по стоимости, времени и материалам.
@@ -67,7 +68,7 @@ export function StatsAdvanced() {
                   aria-disabled
                   className="mt-2 inline-flex min-h-9 items-center rounded-xl bg-ink/10 px-3 py-1.5 text-xs font-semibold text-ink-soft"
                 >
-                  Недоступно на Free
+                  С тарифа «Премиум»
                 </span>
               </div>
             </div>
@@ -105,7 +106,7 @@ export function StatsAdvanced() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-bold">Расширенная аналитика</h2>
         <span className="rounded-full bg-sage-soft px-3 py-1 text-xs font-semibold text-[#55693F]">
-          Premium активен
+          Тариф «{PLAN_LABELS.premium}» активен
         </span>
       </div>
 

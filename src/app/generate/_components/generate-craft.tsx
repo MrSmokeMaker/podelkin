@@ -17,7 +17,9 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { difficultyTone, formatMinutes } from "@/lib/crafts";
+import { PLAN_LABELS } from "@/lib/feature-flags";
 import { useFeatureFlags } from "@/hooks/use-feature-flags";
+import { useSession } from "@/components/session-provider";
 import { useToast } from "@/components/toast";
 import { addShoppingItems } from "@/lib/shopping-list";
 import type { CatalogItem } from "@/lib/catalog-db";
@@ -178,7 +180,8 @@ function CraftCover({
 }
 
 export function GenerateCraft() {
-  const { role } = useFeatureFlags();
+  const { role, generationLimit } = useFeatureFlags();
+  const { refresh } = useSession();
   const toast = useToast();
   const [topic, setTopic] = useState("");
   const [sourceUrl, setSourceUrl] = useState("");
@@ -302,7 +305,7 @@ export function GenerateCraft() {
     setPhase("generating");
     setError(null);
     try {
-      const res = await fetch(`/api/crafts/from-ai?role=${role}`, {
+      const res = await fetch("/api/crafts/from-ai", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt: trimmed }),
@@ -323,6 +326,7 @@ export function GenerateCraft() {
           cached: Boolean(body.cached),
         });
         setRemainingQuota(Number(body.remainingQuota) || 0);
+        refresh();
         setPhase("draft");
         if (body.cached) {
           toast(
@@ -626,14 +630,17 @@ export function GenerateCraft() {
           )}
 
           <div className="mt-4 flex flex-wrap items-center gap-2">
+            <Chip className="bg-clay-soft text-[#8A4A2C]">
+              Тариф «{PLAN_LABELS[role]}»: {generationLimit} генераций в день
+            </Chip>
             {remainingQuota !== null &&
               (remainingQuota > 0 ? (
                 <Chip className="bg-mist-soft text-[#4A6D8C]">
-                  Осталось генераций сегодня: {remainingQuota}
+                  Осталось сегодня: {remainingQuota}
                 </Chip>
               ) : (
                 <Chip className="bg-blush-soft text-[#9C5570]">
-                  Лимит на сегодня исчерпан
+                  Лимит тарифа на сегодня исчерпан
                 </Chip>
               ))}
             <span className="text-xs text-ink-soft">Попробуйте:</span>

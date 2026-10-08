@@ -4,16 +4,18 @@ import { crafts } from "@/lib/db";
 import { collectCost } from "@/lib/cost-calculator";
 import { craftMinutes, formatMinutes, formatRub } from "@/lib/crafts";
 import { StatsAdvanced } from "./_components/stats-advanced";
+import { AiInsights } from "./_components/ai-insights";
 
 export const metadata: Metadata = {
   title: "Статистика",
   description:
-    "Сводка мастерской: базовые показатели для всех тарифов, расширенная аналитика для Premium.",
+    "Сводка мастерской: базовые показатели для всех тарифов, расширенная аналитика для Премиума, ИИ-телеметрия для Директора.",
 };
 
 /* Базовая секция видна всем (totalCrafts, avgTime, avgCost, mostUsedMaterial).
    Расширенная аналитика — клиентский блок, гейтится фича-флагами:
-   free видит его с бейджем Premium и заблокированными контролами. */
+   «Базовый» видит его с бейджем и заблокированными контролами.
+   ИИ-аналитика (Директор) — отдельный блок AiInsights ниже. */
 
 export default function StatsPage() {
   const totalCrafts = crafts.length;
@@ -70,7 +72,8 @@ export default function StatsPage() {
           Статистика мастерской
         </h1>
         <p className="mt-1 text-sm text-ink-soft">
-          Базовые показатели — для всех, детальная аналитика — для Premium
+          Базовые показатели — для всех, детальная аналитика — с Премиума,
+          ИИ-телеметрия — у Директора
         </p>
       </header>
 
@@ -102,6 +105,7 @@ export default function StatsPage() {
       </section>
 
       <StatsAdvanced />
+      <AiInsights />
     </div>
   );
 }

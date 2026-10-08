@@ -5,7 +5,7 @@ import { Crown } from "lucide-react";
    Элементы с бейджем не прячем, а показываем в заблокированном виде. */
 
 export function PremiumBadge({
-  tooltip = "Доступно на тарифе Premium",
+  tooltip = "Доступно на тарифе Премиум",
 }: {
   tooltip?: string;
 }) {

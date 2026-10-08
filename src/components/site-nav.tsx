@@ -7,6 +7,7 @@ import {
   Boxes,
   Layers,
   LayoutGrid,
+  LogIn,
   Plus,
   Scissors,
   Shapes,
@@ -16,6 +17,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { subscribeShoppingList } from "@/lib/shopping-list";
+import { useSession } from "@/components/session-provider";
 
 /* Экспорт и статистика переехали в Профиль → «Настройки» (по брифу). */
 const links = [
@@ -40,6 +42,7 @@ function isActive(pathname: string, href: string) {
 export function SiteHeader() {
   const pathname = usePathname();
   const [shoppingCount, setShoppingCount] = useState(0);
+  const { user } = useSession();
 
   useEffect(
     () =>
@@ -105,6 +108,26 @@ export function SiteHeader() {
               </span>
             )}
           </Link>
+          {user ? (
+            <Link
+              href="/profile"
+              aria-label={`Профиль: ${user.name}`}
+              className="flex min-h-10 items-center gap-2 rounded-xl bg-clay-soft px-2.5 py-1.5 text-sm font-semibold text-[#8A4A2C] transition hover:bg-[#F3E2D3]"
+            >
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-clay text-[11px] font-bold text-paper">
+                {user.name.slice(0, 1).toUpperCase()}
+              </span>
+              <span className="hidden max-w-24 truncate lg:inline">{user.name}</span>
+            </Link>
+          ) : (
+            <Link
+              href="/login"
+              className="flex min-h-10 items-center gap-1.5 rounded-xl bg-clay px-3.5 py-2 text-sm font-semibold text-paper shadow-card transition hover:bg-[#B06A48]"
+            >
+              <LogIn className="h-4 w-4" aria-hidden />
+              Войти
+            </Link>
+          )}
         </div>
       </div>
     </header>

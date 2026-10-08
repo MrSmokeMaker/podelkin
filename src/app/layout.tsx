@@ -3,6 +3,7 @@ import { GeistMono } from "geist/font/mono";
 import { GeistSans } from "geist/font/sans";
 import { cn } from "@/lib/utils";
 import { ToastProvider } from "@/components/toast";
+import { SessionProvider } from "@/components/session-provider";
 import { BottomNav, SiteHeader } from "@/components/site-nav";
 import { PwaRegister } from "@/components/pwa-register";
 import "./globals.css";
@@ -49,12 +50,14 @@ export default function RootLayout({
         )}
       >
         <ToastProvider>
-          <SiteHeader />
-          <main className="mx-auto w-full max-w-5xl px-4 pb-28 pt-6 md:pb-16">
-            {children}
-          </main>
-          <BottomNav />
-          <PwaRegister />
+          <SessionProvider>
+            <SiteHeader />
+            <main className="mx-auto w-full max-w-5xl px-4 pb-28 pt-6 md:pb-16">
+              {children}
+            </main>
+            <BottomNav />
+            <PwaRegister />
+          </SessionProvider>
         </ToastProvider>
       </body>
     </html>

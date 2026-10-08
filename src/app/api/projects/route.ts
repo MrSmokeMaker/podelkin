@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { getAuthUser } from "@/lib/auth";
+import { PLAN_LABELS, formatLimit } from "@/lib/feature-flags";
 import { crafts, createProject, projects } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -8,6 +10,8 @@ export function GET() {
 }
 
 export async function POST(request: Request) {
+  const user = getAuthUser(request);
+
   let body: unknown;
   try {
     body = await request.json();
@@ -31,6 +35,21 @@ export async function POST(request: Request) {
     );
   }
 
-  const project = createProject(craft);
+  /* Лимит тарифа считает только «в работе» проекты пользователя. */
+  const activeCount = projects.filter(
+    (p) => p.status === "в работе" && p.ownerId === user.id
+  ).length;
+  if (activeCount >= user.projectLimit) {
+    return NextResponse.json(
+      {
+        error: `Лимит тарифа «${PLAN_LABELS[user.role]}»: ${formatLimit(
+          user.projectLimit
+        )} проектов одновременно. Завершите текущий или поднимите тариф.`,
+      },
+      { status: 403 }
+    );
+  }
+
+  const project = createProject(craft, user.id);
   return NextResponse.json({ project }, { status: 201 });
 }

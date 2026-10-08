@@ -1,10 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { Layers, Lock, Plus } from "lucide-react";
 import { PremiumBadge } from "@/components/premium-badge";
 import { useToast } from "@/components/toast";
 import { useFeatureFlags } from "@/hooks/use-feature-flags";
+import { formatLimit } from "@/lib/feature-flags";
 
 interface BoardDto {
   id: string;
@@ -14,20 +16,20 @@ interface BoardDto {
 }
 
 export function BoardsClient() {
-  const { has, role, boardLimit } = useFeatureFlags();
+  const { has, boardLimit } = useFeatureFlags();
   const [boards, setBoards] = useState<BoardDto[] | null>(null);
   const [title, setTitle] = useState("");
   const showToast = useToast();
 
   const load = useCallback(async () => {
     try {
-      const res = await fetch(`/api/boards?role=${role}`);
+      const res = await fetch("/api/boards");
       const data = await res.json();
       setBoards(data.boards ?? []);
     } catch {
       setBoards([]);
     }
-  }, [role]);
+  }, []);
 
   useEffect(() => {
     load();
@@ -40,7 +42,7 @@ export function BoardsClient() {
     const trimmed = title.trim();
     if (!trimmed) return;
     try {
-      const res = await fetch(`/api/boards?role=${role}`, {
+      const res = await fetch("/api/boards", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title: trimmed }),
@@ -66,7 +68,7 @@ export function BoardsClient() {
         </h1>
         <p className="mt-1 text-sm text-ink-soft">
           Подборки поделок под цель: кухня, подарки, детская. Лимит тарифа —{" "}
-          {boardLimit} коллекций
+          {formatLimit(boardLimit)} коллекций
         </p>
       </header>
 
@@ -74,10 +76,15 @@ export function BoardsClient() {
         <div className="flex flex-wrap items-center gap-3 rounded-2xl bg-sand-soft p-4 text-sm font-medium text-[#8A6A2F]">
           <Lock className="h-5 w-5 shrink-0" aria-hidden />
           <p className="min-w-0 flex-1">
-            На бесплатном тарифе — до {boardLimit} коллекций. Оформите Premium,
-            чтобы вести до 20.
+            На тарифе «Базовый» — до {boardLimit} коллекций. Премиум даёт до 20,
+            Директор — до 100.
           </p>
-          <PremiumBadge tooltip="Premium: до 20 коллекций и неограниченные проекты" />
+          <Link
+            href="/billing"
+            className="rounded-xl bg-clay px-4 py-2 text-xs font-bold text-paper transition hover:bg-[#B06A48]"
+          >
+            Смотреть тарифы
+          </Link>
         </div>
       )}
 
@@ -129,11 +136,14 @@ export function BoardsClient() {
                           {board.craftTitles.length} поделок
                         </p>
                       </div>
-                      <PremiumBadge tooltip="Эта коллекция откроется на тарифе Premium (до 20 коллекций)" />
+                      <PremiumBadge tooltip="Эта коллекция откроется на тарифе Премиум (до 20 коллекций)" />
                     </div>
-                    <p className="mt-3 text-sm font-medium text-[#9C5570]">
-                      Оформите Premium, чтобы открыть коллекцию
-                    </p>
+                    <Link
+                      href="/billing"
+                      className="mt-3 block text-sm font-semibold text-[#9C5570] hover:underline"
+                    >
+                      Оформите Премиум, чтобы открыть коллекцию
+                    </Link>
                   </div>
                 ) : (
                   <div className="h-full rounded-2xl bg-white p-5 shadow-card ring-1 ring-ink/5">

@@ -4,7 +4,7 @@ import { ExportClient } from "./_components/export-client";
 export const metadata: Metadata = {
   title: "Экспорт",
   description:
-    "Выгрузка сводки мастерской: .txt для всех тарифов, детальный .csv для Premium.",
+    "Выгрузка сводки мастерской: .txt для всех тарифов, детальный .csv для Премиума, полный бэкап .json для Директора.",
 };
 
 export default function ExportPage() {

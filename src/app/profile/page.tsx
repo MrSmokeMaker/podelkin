@@ -4,6 +4,7 @@ import {
   ArrowRight,
   Boxes,
   ChartPie,
+  CreditCard,
   Hammer,
   Heart,
   Layers,
@@ -34,6 +35,13 @@ const secondaryLinks = [
 ];
 
 const settingsLinks = [
+  {
+    href: "/billing",
+    label: "Тарифы и оплата",
+    subtitle: "Базовый, Премиум и Директор — сравнить и подключить",
+    icon: CreditCard,
+    hint: "Генерация с ИИ есть во всех тарифах",
+  },
   {
     href: "/export",
     label: "Сохранить в телефон",

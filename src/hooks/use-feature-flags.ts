@@ -1,41 +1,35 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
+import { useSession } from "@/components/session-provider";
 import {
   BOARD_LIMITS,
-  DEFAULT_ROLE,
-  ROLES,
-  ROLE_STORAGE_KEY,
+  GENERATION_LIMITS,
+  PROJECT_LIMITS,
   resolveFeatures,
   type Feature,
   type Role,
 } from "@/lib/feature-flags";
 
-/* Клиентский доступ к фича-флагам: статическая карта тарифов из
-   src/lib/feature-flags.ts + демо-роль из localStorage. Когда появится
-   реальный API, чтение роли заменится на запрос сессии — контракт хука
-   (role / allowed / blocked / has / boardLimit) не изменится. */
+/* Тариф берётся из сессии (/api/auth/me через SessionProvider), а не из
+   localStorage: роль меняется на сервере при оплате. Пока сессия грузится,
+   действует «Базовый» — как у гостя. */
 
 export function useFeatureFlags() {
-  const [role, setRole] = useState<Role>(DEFAULT_ROLE);
-
-  useEffect(() => {
-    const stored = window.localStorage.getItem(ROLE_STORAGE_KEY);
-    if (stored && (ROLES as string[]).includes(stored)) {
-      setRole(stored as Role);
-    }
-  }, []);
+  const { role } = useSession();
 
   const flags = useMemo(() => resolveFeatures(role), [role]);
 
   const has = (feature: Feature) => flags.allowed.includes(feature);
 
   return {
-    role,
+    role: role as Role,
     allowed: flags.allowed,
     blocked: flags.blocked,
     has,
     boardLimit: BOARD_LIMITS[role],
-    isPremium: role !== "free",
+    projectLimit: PROJECT_LIMITS[role],
+    generationLimit: GENERATION_LIMITS[role],
+    isPremium: role !== "basic",
   };
 }

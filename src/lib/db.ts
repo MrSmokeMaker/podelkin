@@ -40,6 +40,7 @@ export interface Project {
   startedAt: string;
   updatedAt: string;
   steps: ProjectStep[];
+  ownerId: string | null;
 }
 
 export interface Board {
@@ -188,6 +189,7 @@ function seedProjects(): Project[] {
         done: i < doneUntil,
         minutesSpent: i < doneUntil ? step.minutes : 0,
       })),
+      ownerId: null,
     };
   };
 
@@ -204,7 +206,7 @@ export function findProject(id: string): Project | undefined {
   return projects.find((p) => p.id === id);
 }
 
-export function createProject(craft: Craft): Project {
+export function createProject(craft: Craft, ownerId: string | null = null): Project {
   const now = new Date().toISOString();
   const project: Project = {
     id: `prj-${Date.now().toString(36)}`,
@@ -214,6 +216,7 @@ export function createProject(craft: Craft): Project {
     startedAt: now,
     updatedAt: now,
     steps: craft.steps.map((_, i) => ({ index: i, done: false, minutesSpent: 0 })),
+    ownerId,
   };
   projects.push(project);
   return project;
