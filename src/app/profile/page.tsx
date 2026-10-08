@@ -4,11 +4,12 @@ import {
   ArrowRight,
   Boxes,
   ChartPie,
-  Download,
   Hammer,
   Heart,
   Layers,
-  Shapes,
+  Lightbulb,
+  PenLine,
+  Smartphone,
   Sparkles,
 } from "lucide-react";
 import { aiCrafts, boards, crafts, inventory, projects } from "@/lib/db";
@@ -17,49 +18,27 @@ import { ProfileCard } from "./_components/profile-card";
 export const metadata: Metadata = {
   title: "Профиль",
   description:
-    "Ваш профиль в мастерской: проекты, тариф, избранное и быстрый доступ к разделам.",
+    "Ваш профиль в мастерской: быстрые действия, настройки и прогресс.",
 };
 
-const createLinks = [
-  {
-    href: "/generate",
-    label: "Сгенерировать с AI",
-    subtitle: "Новый мастер-класс по вашему описанию",
-    icon: Sparkles,
-  },
-  {
-    href: "/podelki",
-    label: "Мои поделки",
-    subtitle: "Все ваши созданные работы",
-    icon: Shapes,
-  },
-  {
-    href: "/podelki/favorites",
-    label: "Избранное",
-    subtitle: "Идеи, отложенные на потом",
-    icon: Heart,
-  },
-  {
-    href: "/boards",
-    label: "Коллекции идей",
-    subtitle: "Подборки под цель: кухня, подарки, детская",
-    icon: Layers,
-  },
+/* «Действия» — три главных сценария из брифа, больше ничего лишнего. */
+const actions = [
+  { href: "/catalog", label: "Найти идею", icon: Lightbulb },
+  { href: "/podelki/new", label: "Записать поделку", icon: PenLine },
+  { href: "/inventory", label: "Проверить запасы", icon: Boxes },
 ];
 
-const manageLinks = [
-  {
-    href: "/inventory",
-    label: "Запасы",
-    subtitle: "Что на полке и что пора докупить",
-    icon: Boxes,
-    hint: "Остатки материалов и низкие запасы",
-  },
+const secondaryLinks = [
+  { href: "/podelki/favorites", label: "Избранное", icon: Heart },
+  { href: "/boards", label: "Папки с идеями", icon: Layers },
+];
+
+const settingsLinks = [
   {
     href: "/export",
-    label: "Экспорт данных",
-    subtitle: "Скачать проекты и списки в TXT",
-    icon: Download,
+    label: "Сохранить в телефон",
+    subtitle: "Скачать проекты и списки на устройство",
+    icon: Smartphone,
     hint: "Выгрузка мастерской в текстовый файл",
   },
   {
@@ -91,7 +70,7 @@ export default function ProfilePage() {
     {
       icon: Layers,
       tint: "bg-sand-soft text-[#8A6A2F]",
-      label: "Коллекции",
+      label: "Папки",
       value: String(boards.length),
     },
     {
@@ -113,7 +92,7 @@ export default function ProfilePage() {
       <header>
         <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Профиль</h1>
         <p className="mt-1 text-sm text-ink-soft">
-          Мастерская, тариф и всё ваше — в одном месте
+          Действия, настройки и всё ваше — в одном месте
         </p>
       </header>
 
@@ -139,63 +118,20 @@ export default function ProfilePage() {
         </div>
       </section>
 
-      <section aria-label="Создание">
-        <h2 className="text-lg font-bold">Создание</h2>
-        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Link
-            href="/generate"
-            className="group flex items-center gap-4 rounded-2xl bg-clay p-6 shadow-soft ring-1 ring-clay transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#B06A48] active:translate-y-0"
-          >
-            <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/15 text-paper">
-              <Sparkles className="h-7 w-7 transition-transform duration-300 group-hover:rotate-12 group-hover:scale-110" />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-base font-bold text-paper">
-                Сгенерировать с AI
-              </span>
-              <span className="mt-0.5 block text-sm text-paper/80">
-                Новый мастер-класс по вашему описанию
-              </span>
-            </span>
-            <ArrowRight
-              className="h-5 w-5 shrink-0 text-paper/70 transition group-hover:translate-x-1"
-              aria-hidden
-            />
-          </Link>
-          <Link
-            href="/podelki"
-            className="group flex items-center gap-4 rounded-2xl bg-white p-5 shadow-soft ring-2 ring-clay/40 transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0 sm:col-span-2"
-          >
-            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-clay-soft text-[#8A4A2C]">
-              <Shapes className="h-6 w-6" aria-hidden />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block font-bold">Мои поделки</span>
-              <span className="mt-0.5 block text-sm text-ink-soft">
-                Все ваши созданные работы
-              </span>
-            </span>
-            <ArrowRight
-              className="h-5 w-5 shrink-0 text-ink-soft transition group-hover:translate-x-1"
-              aria-hidden
-            />
-          </Link>
-          {createLinks.slice(2).map(({ href, label, subtitle, icon: Icon }) => (
+      <section aria-label="Действия">
+        <h2 className="text-lg font-bold">Действия</h2>
+        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          {actions.map(({ href, label, icon: Icon }) => (
             <Link
               key={href}
               href={href}
               className="group flex items-center gap-3 rounded-2xl bg-white p-4 shadow-card ring-1 ring-ink/5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-soft active:translate-y-0"
             >
-              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-paper-deep/70 text-ink">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-clay-soft text-[#8A4A2C]">
                 <Icon className="h-5 w-5" aria-hidden />
               </span>
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-semibold">
-                  {label}
-                </span>
-                <span className="mt-0.5 block truncate text-xs text-ink-soft">
-                  {subtitle}
-                </span>
+              <span className="min-w-0 flex-1 truncate text-sm font-semibold">
+                {label}
               </span>
               <ArrowRight
                 className="h-4 w-4 shrink-0 text-ink-soft transition group-hover:translate-x-1"
@@ -204,14 +140,26 @@ export default function ProfilePage() {
             </Link>
           ))}
         </div>
+        <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2">
+          {secondaryLinks.map(({ href, label, icon: Icon }) => (
+            <Link
+              key={href}
+              href={href}
+              className="inline-flex items-center gap-1.5 text-sm font-semibold text-[#8A4A2C] hover:underline"
+            >
+              <Icon className="h-4 w-4" aria-hidden />
+              {label}
+            </Link>
+          ))}
+        </div>
       </section>
 
       <hr className="border-ink/10" />
 
-      <section aria-label="Управление">
-        <h2 className="text-lg font-bold">Управление</h2>
-        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
-          {manageLinks.map(({ href, label, subtitle, icon: Icon, hint }) => (
+      <section aria-label="Настройки">
+        <h2 className="text-lg font-bold">Настройки</h2>
+        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {settingsLinks.map(({ href, label, subtitle, icon: Icon, hint }) => (
             <Link
               key={href}
               href={href}

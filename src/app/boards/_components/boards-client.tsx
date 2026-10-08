@@ -47,11 +47,11 @@ export function BoardsClient() {
       });
       const data = await res.json();
       if (!res.ok) {
-        showToast("Лимит коллекций", data.error ?? "Не удалось создать коллекцию");
+        showToast("Лимит папок", data.error ?? "Не удалось создать папку");
         return;
       }
       setTitle("");
-      showToast("Коллекция создана", `«${data.board.title}»`);
+      showToast("Папка создана", `«${data.board.title}»`);
       load();
     } catch {
       showToast("Ошибка сети", "Проверьте соединение и попробуйте снова");
@@ -62,7 +62,7 @@ export function BoardsClient() {
     <div className="space-y-6">
       <header>
         <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
-          Коллекции идей
+          Папки с идеями
         </h1>
         <p className="mt-1 text-sm text-ink-soft">
           Подборки поделок под цель: кухня, подарки, детская. Лимит тарифа —{" "}
@@ -91,10 +91,10 @@ export function BoardsClient() {
         <input
           value={title}
           onChange={(event) => setTitle(event.target.value)}
-          placeholder="Новая коллекция: например «Подарки на Новый год»"
+          placeholder="Новая папка: например «Подарки на Новый год»"
           maxLength={60}
           disabled={atLimit}
-          aria-label="Название новой коллекции"
+          aria-label="Название новой папки"
           className="min-h-12 flex-1 rounded-xl border border-ink/10 bg-white px-4 text-sm outline-none transition focus:border-clay disabled:cursor-not-allowed disabled:opacity-60"
         />
         <button
@@ -103,12 +103,12 @@ export function BoardsClient() {
           className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-clay px-5 py-3 text-sm font-semibold text-paper shadow-card transition hover:bg-[#B06A48] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
         >
           <Plus className="h-4 w-4" aria-hidden />
-          Создать коллекцию
+          Создать папку
         </button>
       </form>
 
       {boards === null ? (
-        <p className="animate-pulse text-sm text-ink-soft">Загружаем доски…</p>
+        <p className="animate-pulse text-sm text-ink-soft">Загружаем папки…</p>
       ) : (
         <ul className="grid gap-4 sm:grid-cols-2">
           {boards.map((board, index) => {

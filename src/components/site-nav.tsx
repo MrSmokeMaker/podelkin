@@ -5,8 +5,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Boxes,
-  ChartPie,
-  Download,
   Layers,
   LayoutGrid,
   Plus,
@@ -19,13 +17,12 @@ import {
 import { cn } from "@/lib/utils";
 import { subscribeShoppingList } from "@/lib/shopping-list";
 
+/* Экспорт и статистика переехали в Профиль → «Настройки» (по брифу). */
 const links = [
   { href: "/catalog", label: "Каталог", icon: LayoutGrid },
   { href: "/generate", label: "AI", icon: Sparkles },
   { href: "/inventory", label: "Запасы", icon: Boxes },
-  { href: "/boards", label: "Доски", icon: Layers },
-  { href: "/export", label: "Экспорт", icon: Download },
-  { href: "/stats", label: "Статистика", icon: ChartPie },
+  { href: "/boards", label: "Папки", icon: Layers },
   { href: "/profile", label: "Профиль", icon: UserRound },
 ];
 
