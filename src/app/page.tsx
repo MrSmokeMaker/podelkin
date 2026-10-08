@@ -1,125 +1,135 @@
 import Link from "next/link";
-import { ArrowRight, Boxes, ChartPie, Hammer, Sparkles } from "lucide-react";
-import { CraftCard } from "@/components/craft-card";
-import { crafts, formatRub, craftCost } from "@/lib/crafts";
+import { ArrowRight, Clock } from "lucide-react";
+import { CraftPhoto } from "@/components/craft-photo";
+import {
+  crafts,
+  craftMinutes,
+  difficultyTone,
+  formatMinutes,
+  stockOf,
+  type Craft,
+} from "@/lib/crafts";
+
+const DIFFICULTY_ORDER: Craft["difficulty"][] = ["Легко", "Средне", "Сложно"];
+
+/* Насколько поделка «из твоих запасов»: доля материалов, которых хватает без докупки. */
+function coverageOf(craft: Craft): number {
+  if (craft.materials.length === 0) return 0;
+  const covered = craft.materials.filter((m) => stockOf(m.name) >= m.qty).length;
+  return covered / craft.materials.length;
+}
+
+function byStockFit(a: Craft, b: Craft): number {
+  const byCoverage = coverageOf(b) - coverageOf(a);
+  if (byCoverage !== 0) return byCoverage;
+  const byDifficulty =
+    DIFFICULTY_ORDER.indexOf(a.difficulty) - DIFFICULTY_ORDER.indexOf(b.difficulty);
+  if (byDifficulty !== 0) return byDifficulty;
+  return a.title.localeCompare(b.title, "ru");
+}
+
+/* Подзаголовок «Из: …» — материалы, которые уже лежат на полке. */
+function stockNames(craft: Craft): string {
+  const owned = craft.materials
+    .filter((m) => stockOf(m.name) > 0)
+    .map((m) => m.name);
+  const names = owned.length > 0 ? owned : craft.materials.map((m) => m.name);
+  return names.slice(0, 2).join(", ");
+}
 
 export default function HomePage() {
-  const featured = crafts.slice(0, 6);
-  const easy = crafts.filter((c) => c.difficulty === "Легко").length;
+  const ranked = [...crafts].sort(byStockFit);
+  const today = ranked[0];
+  const ideas = ranked.slice(1, 5);
 
   return (
-    <div className="space-y-10">
-      <section className="overflow-hidden rounded-3xl bg-clay-soft">
-        <div className="grid lg:grid-cols-[1.15fr_0.85fr]">
-        <div className="p-6 sm:p-10">
-        <p className="text-sm font-semibold uppercase tracking-wider text-[#8A4A2C]">
-          Мастерская идей
-        </p>
-        <h1 className="mt-2 max-w-xl text-3xl font-bold leading-tight tracking-tight text-balance sm:text-4xl">
-          Сделай что-нибудь своими руками — по шагам и без суеты
-        </h1>
-        <p className="mt-3 max-w-lg text-ink-soft">
-          {crafts.length} мастер-классов: от простой свечи за вечер до кружки с
-          обжигом. Пошаговый режим мастера, списки покупок и учёт запасов.
-        </p>
-        <div className="mt-6 flex flex-wrap gap-3">
-          <Link
-            href="/generate"
-            className="flex min-h-12 items-center gap-2 rounded-xl bg-clay px-6 py-3 text-sm font-semibold text-paper shadow-card transition hover:bg-[#B06A48] active:scale-[0.98]"
-          >
-            <Sparkles className="h-4 w-4" />
-            Сгенерировать с AI
-          </Link>
-          <Link
-            href="/stats"
-            className="flex min-h-12 items-center gap-2 rounded-xl bg-white px-6 py-3 text-sm font-semibold text-ink shadow-card ring-1 ring-ink/10 transition hover:bg-paper-deep active:scale-[0.98]"
-          >
-            <ChartPie className="h-4 w-4" />
-            Статистика мастерской
-          </Link>
-        </div>
-        </div>
-        <div className="relative min-h-56 sm:min-h-72 lg:min-h-0">
-          <img
-            src="/hero-lineart.webp"
-            alt="Иллюстрация в стиле лайн-арт: ножницы, клубок пряжи и игла на бежевом фоне"
-            className="absolute inset-0 h-full w-full object-cover"
-          />
-        </div>
-        </div>
-      </section>
-
-      <section>
-        <div className="flex items-end justify-between gap-4">
-          <div>
-            <h2 className="text-xl font-bold tracking-tight sm:text-2xl">
-              Популярные мастер-классы
-            </h2>
-            <p className="mt-1 text-sm text-ink-soft">
-              От простого к сложному — выбирайте по настроению
-            </p>
-          </div>
-          <Link
-            href="/catalog"
-            className="group flex shrink-0 items-center gap-1 text-sm font-semibold text-[#8A4A2C] hover:underline"
-          >
-            Открыть каталог
-            <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
-          </Link>
-        </div>
-        <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {featured.map((craft, index) => (
-            <CraftCard key={craft.slug} craft={craft} index={index} />
-          ))}
-        </div>
-      </section>
-
-      <section className="grid gap-4 sm:grid-cols-2">
-        <Link
-          href="/inventory"
-          className="group flex items-center gap-4 rounded-2xl bg-white p-5 shadow-card ring-1 ring-ink/5 transition hover:-translate-y-0.5 hover:shadow-soft"
+    <div className="space-y-9">
+      <section aria-labelledby="today-heading">
+        <h1
+          id="today-heading"
+          className="text-2xl font-bold tracking-tight sm:text-3xl"
         >
-          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-mist-soft text-[#4A6D8C]">
-            <Boxes className="h-6 w-6" />
-          </span>
-          <span>
-            <span className="block font-bold">Мои запасы</span>
-            <span className="block text-sm text-ink-soft">
-              Что уже есть на полке и что пора докупить
-            </span>
-          </span>
-          <ArrowRight className="ml-auto h-5 w-5 text-ink-soft transition group-hover:translate-x-1" />
+          Что сделать сегодня?
+        </h1>
+        <Link
+          href={`/craft/${today.slug}`}
+          className="group mt-4 flex gap-4 rounded-3xl bg-white p-4 shadow-card ring-1 ring-ink/5 transition hover:shadow-soft sm:gap-6 sm:p-5"
+        >
+          <CraftPhoto
+            craft={today}
+            className="h-28 w-28 shrink-0 sm:h-44 sm:w-44"
+            rounded="rounded-2xl"
+          />
+          <div className="min-w-0 flex-1">
+            <div className="flex items-start justify-between gap-2">
+              <h2 className="text-lg font-bold leading-snug group-hover:text-[#8A4A2C] sm:text-xl">
+                {today.title}
+              </h2>
+              <span
+                className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold ${difficultyTone[today.difficulty]}`}
+              >
+                {today.difficulty}
+              </span>
+            </div>
+            <p className="mt-1.5 line-clamp-2 text-sm text-ink-soft sm:line-clamp-3">
+              {today.description}
+            </p>
+            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-medium text-ink-soft">
+              <span className="flex items-center gap-1.5">
+                <Clock className="h-4 w-4 text-clay" aria-hidden />
+                {formatMinutes(craftMinutes(today))}
+              </span>
+              <span className="hidden sm:inline">
+                {today.steps.length} шагов
+              </span>
+            </div>
+          </div>
         </Link>
-        <div className="flex items-center gap-4 rounded-2xl bg-sage-soft p-5 ring-1 ring-sage/30">
-          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white text-[#55693F]">
-            <Hammer className="h-6 w-6" />
-          </span>
-          <span>
-            <span className="block font-bold">Режим мастера</span>
-            <span className="block text-sm text-[#55693F]/90">
-              Один шаг на экран, таймер и подсказки — открывается из любого
-              мастер-класса
-            </span>
-          </span>
-        </div>
       </section>
 
-      {/* Коротко о мастерской: цифры одной строкой внизу, вместо крупных карточек в хиро */}
-      <footer
-        aria-label="Коротко о мастерской"
-        className="flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-ink/10 pt-4 text-sm text-ink-soft"
+      <section aria-labelledby="ideas-heading">
+        <h2
+          id="ideas-heading"
+          className="text-lg font-bold tracking-tight sm:text-xl"
+        >
+          Идеи из твоих запасов
+        </h2>
+        <ul className="scrollbar-none -mx-4 mt-4 flex snap-x gap-3 overflow-x-auto px-4 pb-1">
+          {ideas.map((craft) => (
+            <li key={craft.slug} className="w-40 shrink-0 snap-start sm:w-44">
+              <Link
+                href={`/craft/${craft.slug}`}
+                className="group block overflow-hidden rounded-2xl bg-white shadow-card ring-1 ring-ink/5 transition hover:shadow-soft"
+              >
+                <CraftPhoto
+                  craft={craft}
+                  className="aspect-square w-full"
+                  rounded="rounded-none"
+                />
+                <div className="p-3">
+                  <h3 className="line-clamp-1 text-sm font-bold group-hover:text-[#8A4A2C]">
+                    {craft.title}
+                  </h3>
+                  <p className="mt-1 line-clamp-1 text-xs text-ink-soft">
+                    Из: {stockNames(craft)}
+                  </p>
+                </div>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <Link
+        href="/inventory"
+        className="group inline-flex items-center gap-1.5 text-sm font-semibold text-[#8A4A2C] hover:underline"
       >
-        <span className="font-semibold text-ink">{crafts.length}</span> мастер-классов
-        <span aria-hidden>·</span>
-        <span className="font-semibold text-ink">{easy}</span> для новичков
-        <span aria-hidden>·</span>
-        средний чек
-        <span className="font-semibold text-ink">
-          {formatRub(
-            crafts.reduce((s, c) => s + craftCost(c), 0) / crafts.length
-          )}
-        </span>
-      </footer>
+        Все мои запасы
+        <ArrowRight
+          className="h-4 w-4 transition group-hover:translate-x-0.5"
+          aria-hidden
+        />
+      </Link>
     </div>
   );
 }
