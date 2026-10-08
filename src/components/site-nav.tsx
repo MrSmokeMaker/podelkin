@@ -40,7 +40,6 @@ function isActive(pathname: string, href: string) {
 
 export function SiteHeader() {
   const pathname = usePathname();
-  if (pathname.startsWith("/build/")) return null;
 
   const podelkiActive = pathname.startsWith("/podelki");
 
@@ -98,7 +97,6 @@ export function SiteHeader() {
 
 export function BottomNav() {
   const pathname = usePathname();
-  if (pathname.startsWith("/build/")) return null;
 
   const renderLink = ({ href, label, icon: Icon }: (typeof mobileLinks)[number]) => {
     const active = isActive(pathname, href);

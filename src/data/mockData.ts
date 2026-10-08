@@ -93,6 +93,7 @@ export const inventory: StockItem[] = [
 export const crafts: Craft[] = [
   {
     slug: "keramicheskaya-kruzhka",
+    image: "/crafts/keramicheskaya-kruzhka.webp",
     title: "Керамическая кружка",
     description:
       "Кружка ручной лепки жгутовой техникой — от первого жгутика до политого обжига. Готовая кружка держит тепло и радует неровностями ручной работы.",
@@ -157,6 +158,7 @@ export const crafts: Craft[] = [
   },
   {
     slug: "derevyannaya-lozhka",
+    image: "/crafts/derevyannaya-lozhka.webp",
     title: "Деревянная ложка",
     description:
       "Первая ложка своими руками: липа мягкая и податливая, она прощает новичку неточности. Резьба, шлифовка и пропитка маслом — за один вечер.",
@@ -227,6 +229,7 @@ export const crafts: Craft[] = [
   },
   {
     slug: "panno-makrame",
+    image: "/crafts/panno-makrame.webp",
     title: "Панно в технике макраме",
     description:
       "Уютное панно с ромбом из узлов на деревянной планке. Достаточно освоить два узла — квадратный и репсовый — и повторять их по схеме.",
@@ -285,6 +288,7 @@ export const crafts: Craft[] = [
   },
   {
     slug: "soevaya-svecha",
+    image: "/crafts/soevaya-svecha.webp",
     title: "Соевая свеча в стакане",
     description:
       "Свеча из соевого воска горит чисто, без копоти, и отдаёт мягкий аромат лаванды. Ароматизируйте воск строго по термометру — тогда запах не выгорит.",
@@ -352,6 +356,7 @@ export const crafts: Craft[] = [
   },
   {
     slug: "snud-kruchkom",
+    image: "/crafts/snud-kruchkom.webp",
     title: "Снуд крючком",
     description:
       "Классический снуд столбиками с накидом — вяжется за пару вечеров и прощает ошибки. Одного мотка на 150 м хватает на 5 рядов.",
@@ -409,6 +414,7 @@ export const crafts: Craft[] = [
   },
   {
     slug: "vyshivka-na-pyaltsah",
+    image: "/crafts/vyshivka-na-pyaltsah.webp",
     title: "Вышивка на пяльцах",
     description:
       "Миниатюра в пяльцах — цветущая веточка гладью. Готовая работа остаётся в тех же пяльцах и вешается на стену как украшение.",
@@ -467,6 +473,7 @@ export const crafts: Craft[] = [
   },
   {
     slug: "bumazhnyy-svetilnik",
+    image: "/crafts/bumazhnyy-svetilnik.webp",
     title: "Бумажный светильник-оригами",
     description:
       "Светильник из складок ватмана даёт тёплый рассеянный свет. Внутри — только светодиодная гирлянда на батарейках, без единого провода.",
@@ -523,6 +530,7 @@ export const crafts: Craft[] = [
   },
   {
     slug: "vaza-iz-pape-mashe",
+    image: "/crafts/vaza-iz-pape-mashe.webp",
     title: "Ваза из папье-маше",
     description:
       "Ваза из газет и клея — классика папье-маше, которую не стыдно поставить на полку. Работы на полчаса в день, остальное делает сушка.",
@@ -584,6 +592,7 @@ export const crafts: Craft[] = [
   },
   {
     slug: "eko-sumka-iz-dzhinsov",
+    image: "/crafts/eko-sumka-iz-dzhinsov.webp",
     title: "Эко-сумка из старых джинсов",
     description:
       "Сумка из джинсов, которые давно ждут вторую жизнь. Крепкая ткань шьётся легко, а характерные потёртости делают каждую сумку единственной.",
@@ -644,6 +653,7 @@ export const crafts: Craft[] = [
   },
   {
     slug: "sergi-iz-epoksidnoy-smoly",
+    image: "/crafts/sergi-iz-epoksidnoy-smoly.webp",
     title: "Серьги из эпоксидной смолы",
     description:
       "Полупрозрачные серьги с каплей цвета — почти ювелирка в домашних условиях. Главные союзники: точные весы, силиконовая форма и терпение на сутки.",
@@ -708,6 +718,7 @@ export const crafts: Craft[] = [
   },
   {
     slug: "mylo-s-nulya",
+    image: "/crafts/mylo-s-nulya.webp",
     title: "Мыло с нуля: холодный способ",
     description:
       "Настоящее мыло с нуля: кастилья с кокосом и маслом чайного дерева. Щёлочь требует уважения и защиты, а результат зреет 4 недели.",
@@ -779,6 +790,7 @@ export const crafts: Craft[] = [
   },
   {
     slug: "valyanaya-brosh-lichenok",
+    image: "/crafts/valyanaya-brosh-lichenok.webp",
     title: "Валяная брошь «Лисёнок»",
     description:
       "Плоская брошь из шерсти сухим валянием — идеальный первый проект в фелтинге. Всего три цвета шерсти, две иглы и один вечер.",

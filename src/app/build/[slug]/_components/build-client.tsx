@@ -12,6 +12,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { ProgressBar } from "@/components/progress";
+import { CraftPhoto } from "@/components/craft-photo";
 import { SafetyBanner } from "@/components/safety-banner";
 import { Stopwatch } from "@/components/stopwatch";
 import {
@@ -168,7 +169,14 @@ export function BuildClient({ slug }: { slug: string }) {
         </>
       ) : (
         <section className="rounded-3xl bg-white p-8 text-center shadow-card ring-1 ring-ink/5">
-          <span className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-sage-soft text-[#55693F]">
+          <div className="mx-auto max-w-sm overflow-hidden rounded-2xl shadow-card ring-1 ring-ink/5">
+            <CraftPhoto
+              craft={craft}
+              className="aspect-square w-full"
+              rounded=""
+            />
+          </div>
+          <span className="mx-auto mt-6 flex h-16 w-16 items-center justify-center rounded-full bg-sage-soft text-[#55693F]">
             <PartyPopper className="h-8 w-8" />
           </span>
           <h2 className="mt-4 text-2xl font-bold">Готово!</h2>
