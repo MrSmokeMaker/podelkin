@@ -3,10 +3,12 @@ import Link from "next/link";
 import {
   ArrowRight,
   Boxes,
+  ChartPie,
+  CreditCard,
   Hammer,
   Heart,
   Layers,
-  Settings,
+  Smartphone,
   Sparkles,
 } from "lucide-react";
 import { aiCrafts, boards, crafts, inventory, projects } from "@/lib/db";
@@ -18,7 +20,30 @@ export const metadata: Metadata = {
     "Ваш профиль в мастерской: тариф, настройки и прогресс.",
 };
 
-/* Тариф, экспорт и статистика живут на отдельной странице /settings. */
+/* Настройки: тариф, выгрузка данных и статистика. */
+const settingsLinks = [
+  {
+    href: "/billing",
+    label: "Тарифы и оплата",
+    subtitle: "Базовый, Премиум и Директор — сравнить и подключить",
+    icon: CreditCard,
+    hint: "Генерация с ИИ есть во всех тарифах",
+  },
+  {
+    href: "/export",
+    label: "Сохранить в телефон",
+    subtitle: "Скачать проекты и списки на устройство",
+    icon: Smartphone,
+    hint: "Выгрузка мастерской в текстовый файл",
+  },
+  {
+    href: "/stats",
+    label: "Статистика",
+    subtitle: "Прогресс мастерской в цифрах",
+    icon: ChartPie,
+    hint: "Сколько сделано и что в планах",
+  },
+];
 
 export default function ProfilePage() {
   const inProgress = projects.filter((p) => p.status === "в работе").length;
@@ -90,19 +115,41 @@ export default function ProfilePage() {
 
       <hr className="border-ink/10" />
 
-      <Link
-        href="/settings"
-        className="group flex items-center gap-3 rounded-2xl bg-white p-4 shadow-card ring-1 ring-ink/5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-soft active:translate-y-0"
-      >
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-paper-deep/70 text-ink">
-          <Settings className="h-5 w-5" aria-hidden />
-        </span>
-        <span className="min-w-0 flex-1 truncate text-sm font-semibold">Настройки</span>
-        <ArrowRight
-          className="h-4 w-4 shrink-0 text-ink-soft transition group-hover:translate-x-1"
-          aria-hidden
-        />
-      </Link>
+      <section aria-label="Настройки">
+        <h2 className="text-lg font-bold">Настройки</h2>
+        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          {settingsLinks.map(({ href, label, subtitle, icon: Icon, hint }) => (
+            <Link
+              key={href}
+              href={href}
+              className="group flex items-center gap-3 rounded-2xl bg-white p-4 shadow-card ring-1 ring-ink/5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-soft active:translate-y-0"
+            >
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-paper-deep/70 text-ink">
+                <Icon className="h-5 w-5" aria-hidden />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="flex items-center gap-1.5">
+                  <span className="truncate text-sm font-semibold">{label}</span>
+                  <span
+                    title={hint}
+                    aria-label={hint}
+                    className="flex h-4 w-4 shrink-0 cursor-help items-center justify-center rounded-full bg-paper-deep text-[10px] font-bold text-ink-soft"
+                  >
+                    ?
+                  </span>
+                </span>
+                <span className="mt-0.5 block truncate text-xs text-ink-soft">
+                  {subtitle}
+                </span>
+              </span>
+              <ArrowRight
+                className="h-4 w-4 shrink-0 text-ink-soft transition group-hover:translate-x-1"
+                aria-hidden
+              />
+            </Link>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }
