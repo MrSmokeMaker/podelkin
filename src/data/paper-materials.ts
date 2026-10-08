@@ -26,6 +26,7 @@ const templates = {
   buttons: { name: "Пуговицы", unit: "шт", price: 5 },
   magnets: { name: "Магниты плоские", unit: "шт", price: 20 },
   napkins: { name: "Салфетки бумажные", unit: "шт", price: 1 },
+  newspaper: { name: "Газеты", unit: "лист", price: 2 },
   magazines: { name: "Старые журналы", unit: "шт", price: 0 },
   pins: { name: "Канцелярские кнопки", unit: "шт", price: 1 },
   clips: { name: "Скрепки канцелярские", unit: "шт", price: 1 },
