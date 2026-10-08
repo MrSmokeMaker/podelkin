@@ -1,3 +1,6 @@
+import { paperCrafts } from "./paper-crafts";
+import { paperStock } from "./paper-materials";
+
 export type Category =
   | "Пряжа"
   | "Ткань"
@@ -88,6 +91,7 @@ export const inventory: StockItem[] = [
   { name: "Наполнитель холлофайбер", stock: 200, unit: "г" },
   { name: "Глазки для игрушек", stock: 12, unit: "шт" },
   { name: "Синтепон 30×30 см", stock: 3, unit: "отрез" },
+  ...paperStock,
 ];
 
 export const crafts: Craft[] = [
@@ -1040,4 +1044,5 @@ export const crafts: Craft[] = [
       "Стёганую прихватку с синтепоном можно брать горячее войлочной, но всё равно не держите у открытого огня.",
     ],
   },
+  ...paperCrafts,
 ];
