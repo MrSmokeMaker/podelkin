@@ -256,7 +256,7 @@ export function GenerateCraft() {
     setImporting(true);
     setError(null);
     try {
-      const res = await fetch("/api/catalog/import", {
+      const res = await fetch("/api/catalog", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: urlTrimmed }),
