@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, ImagePlus, Loader2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/toast";
+import { addShoppingItems } from "@/lib/shopping-list";
 import { DIFFICULTY_STYLES } from "../../_components/catalog-visuals";
 
 const CATEGORIES = [
@@ -136,7 +137,22 @@ export function NewPodelkaClient() {
         setSubmitting(false);
         return;
       }
-      toast("Поделка добавлена", title);
+
+      const craftTitle = title.trim();
+      const materialNames = materials
+        .split(",")
+        .map((material) => material.trim())
+        .filter(Boolean);
+      const { added } = addShoppingItems(
+        materialNames.map((name) => ({ name, source: craftTitle }))
+      );
+
+      toast(
+        "Поделка добавлена",
+        added > 0
+          ? `Материалы (${added}) — в списке покупок`
+          : title
+      );
       router.push(`/podelki/${payload.item.id}`);
     } catch {
       setError("Сеть недоступна — проверьте соединение и попробуйте ещё раз");

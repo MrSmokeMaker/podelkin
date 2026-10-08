@@ -15,7 +15,7 @@ export default function ShoppingListPage() {
           Список покупок
         </h1>
         <p className="mt-1 text-sm text-ink-soft">
-          Всё, что нужно докупить: из запасов, поделок и вручную — в одном списке
+          Материалы из генераций, источников и новых поделок попадают сюда сами
         </p>
       </header>
       <ShoppingListClient />

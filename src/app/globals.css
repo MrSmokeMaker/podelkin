@@ -47,6 +47,10 @@ h4 {
   .animate-chip-pulse {
     animation: chip-pulse 0.3s ease-out;
   }
+  /* Вспышка галочки «куплено» в списке покупок */
+  .animate-check-pop {
+    animation: check-pop 0.35s ease-out;
+  }
 }
 
 @keyframes card-in {
@@ -72,10 +76,23 @@ h4 {
   }
 }
 
+@keyframes check-pop {
+  0% {
+    transform: scale(0.6);
+  }
+  55% {
+    transform: scale(1.18);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
 /* Уважаем системную настройку «меньше движения» */
 @media (prefers-reduced-motion: reduce) {
   .animate-card-in,
-  .animate-chip-pulse {
+  .animate-chip-pulse,
+  .animate-check-pop {
     animation: none;
   }
 }

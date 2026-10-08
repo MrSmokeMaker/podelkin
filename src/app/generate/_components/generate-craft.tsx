@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils";
 import { difficultyTone, formatMinutes } from "@/lib/crafts";
 import { useFeatureFlags } from "@/hooks/use-feature-flags";
 import { useToast } from "@/components/toast";
+import { addShoppingItems } from "@/lib/shopping-list";
 import type { CatalogItem } from "@/lib/catalog-db";
 
 interface DraftData {
@@ -267,11 +268,24 @@ export function GenerateCraft() {
       } | null;
 
       if (res.ok && body?.item) {
-        setImported(body.item);
+        const item = body.item;
+        setImported(item);
         setSourceUrl("");
+        const { added } = addShoppingItems(
+          item.materials.map((material) => ({
+            name: material,
+            source: item.title,
+          }))
+        );
+        const notes = [
+          item.thumbnail ? null : "Итоговое фото скачать не удалось",
+          added > 0
+            ? `Материалы (${added}) — в списке покупок`
+            : null,
+        ].filter((note): note is string => note !== null);
         toast(
           "Поделка добавлена в «Поделки»",
-          body.item.thumbnail ? undefined : "Итоговое фото скачать не удалось"
+          notes.length > 0 ? notes.join(" · ") : undefined
         );
         return;
       }
@@ -353,6 +367,16 @@ export function GenerateCraft() {
       } | null;
 
       if (res.status === 201 && body?.craftId) {
+        const { added } = addShoppingItems(
+          draft.data.materials
+            .filter((material) => !material.optional)
+            .map((material) => ({
+              name: material.name,
+              qty: material.qty,
+              unit: material.unit,
+              source: draft.data.title,
+            }))
+        );
         setResult({
           craftId: body.craftId,
           imageUrl: body.imageUrl ?? null,
@@ -360,11 +384,17 @@ export function GenerateCraft() {
           fromCache: Boolean(body.fromCache),
         });
         setPhase("done");
-        toast(
-          "Поделка создана",
+        const notes = [
           body.imageFailed
             ? "Текст сохранён, но картинка не отрисовалась"
-            : undefined
+            : null,
+          added > 0
+            ? `Материалы (${added}) — в списке покупок`
+            : null,
+        ].filter((note): note is string => note !== null);
+        toast(
+          "Поделка создана",
+          notes.length > 0 ? notes.join(" · ") : undefined
         );
         return;
       }

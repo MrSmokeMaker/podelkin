@@ -2,18 +2,11 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import {
-  Check,
-  Download,
-  Plus,
-  ShoppingCart,
-  Trash2,
-  X,
-} from "lucide-react";
+import { Check, Copy, Download, ShoppingCart, Trash2, X } from "lucide-react";
 import { useToast } from "@/components/toast";
+import { ProgressBar } from "@/components/progress";
 import { formatQty, formatRub } from "@/lib/crafts";
 import {
-  addShoppingItems,
   clearBoughtShoppingItems,
   clearShoppingList,
   estimateTotal,
@@ -28,6 +21,24 @@ import { cn } from "@/lib/utils";
 function qtyText(item: ShoppingItem): string | null {
   if (item.qty == null) return null;
   return `${formatQty(item.qty)}${item.unit ? ` ${item.unit}` : ""}`;
+}
+
+/* Порядок групп — по первому появлению источника в списке. */
+function groupBySource(items: ShoppingItem[]): { source: string; items: ShoppingItem[] }[] {
+  const groups = new Map<string, ShoppingItem[]>();
+  for (const item of items) {
+    const key = item.source ?? "Без источника";
+    const bucket = groups.get(key);
+    if (bucket) {
+      bucket.push(item);
+    } else {
+      groups.set(key, [item]);
+    }
+  }
+  return Array.from(groups.entries()).map(([source, groupItems]) => ({
+    source,
+    items: groupItems,
+  }));
 }
 
 function downloadText(text: string): boolean {
@@ -47,6 +58,8 @@ function downloadText(text: string): boolean {
   }
 }
 
+/* Вычёркивание: линия поверх названия растёт слева направо, текст и цена
+   гаснут, галочка «вспыхивает» (animate-check-pop в globals.css). */
 function ShoppingRow({
   item,
   onToggle,
@@ -65,9 +78,9 @@ function ShoppingRow({
         aria-pressed={item.bought}
         aria-label={item.bought ? `Вернуть в покупки: ${item.name}` : `Отметить купленным: ${item.name}`}
         className={cn(
-          "flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 transition-colors active:scale-95",
+          "flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 transition-all duration-300 active:scale-95",
           item.bought
-            ? "border-sage bg-sage text-white"
+            ? "border-sage bg-sage text-white animate-check-pop"
             : "border-ink/25 text-transparent hover:border-clay hover:text-clay"
         )}
       >
@@ -76,11 +89,20 @@ function ShoppingRow({
       <div className="min-w-0 flex-1">
         <p
           className={cn(
-            "truncate text-sm font-semibold",
-            item.bought && "text-ink-soft line-through"
+            "truncate text-sm font-semibold transition-colors duration-500",
+            item.bought && "text-ink-soft"
           )}
         >
-          {item.name}
+          <span className="relative inline-block max-w-full align-bottom">
+            {item.name}
+            <span
+              aria-hidden
+              className={cn(
+                "pointer-events-none absolute left-0 top-1/2 h-[1.5px] w-full origin-left -translate-y-1/2 rounded-full bg-ink-soft/80 transition-transform duration-500 ease-out",
+                item.bought ? "scale-x-100" : "scale-x-0"
+              )}
+            />
+          </span>
         </p>
         {item.source && (
           <p className="truncate text-xs text-ink-soft">{item.source}</p>
@@ -90,7 +112,7 @@ function ShoppingRow({
         {qty && (
           <p
             className={cn(
-              "text-sm font-semibold text-[#8A4A2C]",
+              "text-sm font-semibold text-[#8A4A2C] transition-colors duration-500",
               item.bought && "text-ink-soft line-through"
             )}
           >
@@ -98,7 +120,14 @@ function ShoppingRow({
           </p>
         )}
         {item.qty != null && item.price != null && (
-          <p className="text-xs text-ink-soft">{formatRub(item.qty * item.price)}</p>
+          <p
+            className={cn(
+              "text-xs text-ink-soft transition-opacity duration-500",
+              item.bought && "opacity-60"
+            )}
+          >
+            {formatRub(item.qty * item.price)}
+          </p>
         )}
       </div>
       <button
@@ -116,9 +145,7 @@ function ShoppingRow({
 export function ShoppingListClient() {
   const showToast = useToast();
   const [items, setItems] = useState<ShoppingItem[] | null>(null);
-  const [name, setName] = useState("");
-  const [qty, setQty] = useState("");
-  const [unit, setUnit] = useState("шт");
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => subscribeShoppingList(setItems), []);
 
@@ -130,21 +157,16 @@ export function ShoppingListClient() {
   const bought = items.filter((item) => item.bought);
   const total = estimateTotal(items);
 
-  const onAdd = (event: React.FormEvent) => {
-    event.preventDefault();
-    const trimmed = name.trim();
-    if (!trimmed) return;
-    const parsedQty = qty.trim() ? Number(qty.replace(",", ".")) : null;
-    addShoppingItems([
-      {
-        name: trimmed,
-        qty: parsedQty != null && Number.isFinite(parsedQty) ? parsedQty : null,
-        unit: unit.trim() || null,
-      },
-    ]);
-    setName("");
-    setQty("");
-    setUnit("шт");
+  const onCopy = async () => {
+    const text = shoppingListText(items);
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+      showToast("Скопировано в буфер обмена", text);
+    } catch {
+      showToast("Список покупок", text);
+    }
   };
 
   const onExport = () => {
@@ -174,64 +196,45 @@ export function ShoppingListClient() {
         )}
       </div>
 
-      <form
-        className="flex flex-col gap-2 rounded-2xl bg-white p-4 shadow-card ring-1 ring-ink/5 sm:flex-row"
-        onSubmit={onAdd}
-      >
-        <input
-          value={name}
-          onChange={(event) => setName(event.target.value)}
-          placeholder="Что купить: например «Глина красная»"
-          maxLength={60}
-          aria-label="Название товара"
-          className="min-h-12 flex-1 rounded-xl border border-ink/10 bg-paper px-4 text-sm outline-none transition focus:border-clay"
-        />
-        <input
-          value={qty}
-          onChange={(event) => setQty(event.target.value)}
-          placeholder="Кол-во"
-          inputMode="decimal"
-          maxLength={8}
-          aria-label="Количество"
-          className="min-h-12 w-full rounded-xl border border-ink/10 bg-paper px-4 text-sm outline-none transition focus:border-clay sm:w-24"
-        />
-        <input
-          value={unit}
-          onChange={(event) => setUnit(event.target.value)}
-          placeholder="ед."
-          maxLength={10}
-          aria-label="Единица измерения"
-          className="min-h-12 w-full rounded-xl border border-ink/10 bg-paper px-4 text-sm outline-none transition focus:border-clay sm:w-24"
-        />
-        <button
-          type="submit"
-          disabled={!name.trim()}
-          className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-clay px-5 py-3 text-sm font-semibold text-paper shadow-card transition hover:bg-[#B06A48] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <Plus className="h-4 w-4" aria-hidden />
-          Добавить
-        </button>
-      </form>
-
       {items.length === 0 ? (
         <div className="rounded-2xl bg-white p-6 text-center shadow-card ring-1 ring-ink/5">
           <span className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-clay-soft text-[#8A4A2C]">
             <ShoppingCart className="h-6 w-6" aria-hidden />
           </span>
-          <p className="mt-3 font-bold">Список пока пуст</p>
+          <p className="mt-3 font-bold">Список наполнится сам</p>
           <p className="mx-auto mt-1 max-w-sm text-sm text-ink-soft">
-            Добавьте позицию вручную или отправьте сюда низкие остатки из запасов
-            и недостающие материалы поделки.
+            Сгенерируйте поделку, добавьте её из источника или создайте свою —
+            материалы попадут сюда автоматически. Низкие остатки можно скинуть
+            из запасов.
           </p>
-          <Link
-            href="/inventory"
-            className="mt-4 inline-flex min-h-11 items-center gap-2 rounded-xl bg-clay px-5 py-2.5 text-sm font-semibold text-paper shadow-card transition hover:bg-[#B06A48] active:scale-[0.98]"
-          >
-            Перейти в запасы
-          </Link>
+          <div className="mt-4 flex flex-wrap justify-center gap-2">
+            <Link
+              href="/generate"
+              className="inline-flex min-h-11 items-center rounded-xl bg-clay px-5 py-2.5 text-sm font-semibold text-paper shadow-card transition hover:bg-[#B06A48] active:scale-[0.98]"
+            >
+              Сгенерировать поделку
+            </Link>
+            <Link
+              href="/inventory"
+              className="inline-flex min-h-11 items-center rounded-xl bg-white px-5 py-2.5 text-sm font-semibold text-ink ring-1 ring-ink/10 transition hover:bg-paper-deep active:scale-[0.98]"
+            >
+              Перейти в запасы
+            </Link>
+          </div>
         </div>
       ) : (
         <>
+          <section
+            aria-label="Прогресс покупок"
+            className="rounded-2xl bg-white p-5 shadow-card ring-1 ring-ink/5"
+          >
+            <ProgressBar
+              value={bought.length}
+              max={items.length}
+              label={`Куплено ${bought.length} из ${items.length}`}
+            />
+          </section>
+
           <section
             aria-label="К покупке"
             className="rounded-2xl bg-white px-5 py-2 shadow-card ring-1 ring-ink/5"
@@ -242,16 +245,29 @@ export function ShoppingListClient() {
                 Всё куплено — по списку больше ничего не нужно.
               </p>
             ) : (
-              <ul className="divide-y divide-ink/5">
-                {toBuy.map((item) => (
-                  <ShoppingRow
-                    key={item.id}
-                    item={item}
-                    onToggle={(id) => setItems(toggleShoppingItemBought(id))}
-                    onRemove={(id) => setItems(removeShoppingItem(id))}
-                  />
-                ))}
-              </ul>
+              groupBySource(toBuy).map((group, groupIndex) => (
+                <div
+                  key={group.source}
+                  className={cn(groupIndex > 0 && "border-t border-dashed border-ink/10")}
+                >
+                  <h3 className="flex items-center gap-2 pt-3 text-[11px] font-bold uppercase tracking-wide text-ink-soft">
+                    {group.source}
+                    <span className="rounded-full bg-paper-deep px-2 py-0.5 text-[10px] font-semibold normal-case">
+                      {group.items.length}
+                    </span>
+                  </h3>
+                  <ul className="divide-y divide-ink/5">
+                    {group.items.map((item) => (
+                      <ShoppingRow
+                        key={item.id}
+                        item={item}
+                        onToggle={(id) => setItems(toggleShoppingItemBought(id))}
+                        onRemove={(id) => setItems(removeShoppingItem(id))}
+                      />
+                    ))}
+                  </ul>
+                </div>
+              ))
             )}
           </section>
 
@@ -291,6 +307,18 @@ export function ShoppingListClient() {
             >
               <Download className="h-4 w-4" aria-hidden />
               Экспорт в .txt
+            </button>
+            <button
+              type="button"
+              onClick={onCopy}
+              className="flex min-h-12 items-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-semibold text-ink shadow-card ring-1 ring-ink/10 transition hover:bg-paper-deep active:scale-[0.98]"
+            >
+              <Check
+                className={cn("h-4 w-4 text-[#55693F]", !copied && "hidden")}
+                aria-hidden
+              />
+              <Copy className={cn("h-4 w-4", copied && "hidden")} aria-hidden />
+              {copied ? "Скопировано" : "Скопировать"}
             </button>
             <button
               type="button"
