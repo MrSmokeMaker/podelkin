@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -11,10 +12,12 @@ import {
   Plus,
   Scissors,
   Shapes,
+  ShoppingCart,
   Sparkles,
   UserRound,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { subscribeShoppingList } from "@/lib/shopping-list";
 
 const links = [
   { href: "/catalog", label: "Каталог", icon: LayoutGrid },
@@ -39,8 +42,17 @@ function isActive(pathname: string, href: string) {
 
 export function SiteHeader() {
   const pathname = usePathname();
+  const [shoppingCount, setShoppingCount] = useState(0);
 
-  const podelkiActive = pathname.startsWith("/podelki");
+  useEffect(
+    () =>
+      subscribeShoppingList((items) =>
+        setShoppingCount(items.filter((item) => !item.bought).length)
+      ),
+    []
+  );
+
+  const shoppingActive = pathname.startsWith("/shopping-list");
 
   return (
     <header className="sticky top-0 z-40 border-b border-ink/10 bg-paper/90 backdrop-blur">
@@ -76,17 +88,25 @@ export function SiteHeader() {
             })}
           </nav>
           <Link
-            href="/podelki"
-            aria-current={podelkiActive ? "page" : undefined}
+            href="/shopping-list"
+            aria-current={shoppingActive ? "page" : undefined}
             className={cn(
               "flex items-center gap-1.5 rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors",
-              podelkiActive
+              shoppingActive
                 ? "bg-clay-soft text-[#8A4A2C]"
                 : "text-ink-soft hover:bg-clay-soft/60 hover:text-ink"
             )}
           >
-            <Shapes className="h-5 w-5" />
-            Поделки
+            <ShoppingCart className="h-5 w-5" />
+            Покупки
+            {shoppingCount > 0 && (
+              <span
+                aria-label={`${shoppingCount} позиций к покупке`}
+                className="flex h-5 min-w-5 items-center justify-center rounded-full bg-clay px-1.5 text-[11px] font-bold text-paper"
+              >
+                {shoppingCount}
+              </span>
+            )}
           </Link>
         </div>
       </div>

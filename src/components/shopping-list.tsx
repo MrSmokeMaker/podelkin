@@ -1,7 +1,8 @@
 "use client";
 
-import { Download, CheckCircle2 } from "lucide-react";
+import { Download, CheckCircle2, ShoppingCart } from "lucide-react";
 import { useToast } from "@/components/toast";
+import { addShoppingItems } from "@/lib/shopping-list";
 import {
   exportListText,
   formatRub,
@@ -31,6 +32,22 @@ export function ShoppingList({ craft }: { craft: Craft }) {
     } catch {
       showToast("Список покупок", text);
     }
+  };
+
+  const handleAddAll = () => {
+    const { added } = addShoppingItems(
+      missing.map(({ material, missing: qty }) => ({
+        name: material.name,
+        qty,
+        unit: material.unit,
+        price: material.price,
+        source: craft.title,
+      }))
+    );
+    showToast(
+      added > 0 ? `В списке покупок: +${added} поз.` : "Эти позиции уже в списке",
+      "Кнопка «Покупки» — в шапке сверху"
+    );
   };
 
   return (
@@ -74,14 +91,25 @@ export function ShoppingList({ craft }: { craft: Craft }) {
           Итого к оплате:{" "}
           <span className="text-base font-bold text-ink">{formatRub(total)}</span>
         </p>
-        <button
-          type="button"
-          onClick={handleExport}
-          className="flex min-h-12 items-center gap-2 rounded-xl bg-clay px-5 py-3 text-sm font-semibold text-paper shadow-card transition hover:bg-[#B06A48] active:scale-[0.98]"
-        >
-          <Download className="h-4 w-4" />
-          Экспорт в .txt
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={handleAddAll}
+            disabled={missing.length === 0}
+            className="flex min-h-12 items-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-semibold text-ink shadow-card ring-1 ring-ink/10 transition hover:bg-clay-soft hover:text-[#8A4A2C] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <ShoppingCart className="h-4 w-4" />
+            В общий список
+          </button>
+          <button
+            type="button"
+            onClick={handleExport}
+            className="flex min-h-12 items-center gap-2 rounded-xl bg-clay px-5 py-3 text-sm font-semibold text-paper shadow-card transition hover:bg-[#B06A48] active:scale-[0.98]"
+          >
+            <Download className="h-4 w-4" />
+            Экспорт в .txt
+          </button>
+        </div>
       </div>
     </section>
   );

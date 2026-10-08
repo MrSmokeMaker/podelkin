@@ -5,6 +5,7 @@ import { ChevronDown, Plus, ShoppingCart } from "lucide-react";
 import { ProgressBar } from "@/components/progress";
 import { useToast } from "@/components/toast";
 import { crafts, formatQty } from "@/lib/crafts";
+import { addShoppingItems } from "@/lib/shopping-list";
 import { cn } from "@/lib/utils";
 import type { StockItem } from "@/data/mockData";
 
@@ -118,28 +119,32 @@ export function InventoryClient({ items }: { items: StockItem[] }) {
     return groupOf(item.name) === filter;
   });
 
-  const shoppingText = () => {
+  const addToShoppingList = () => {
     const low = items.filter((item) => {
       const max = MAX_BY_UNIT[item.unit] ?? 5;
       return Math.min(100, Math.round((item.stock / max) * 100)) < 20;
     });
-    return [
-      "Докупить в мастерской:",
-      ...low.map(
-        (item) =>
-          `• ${item.name} — сейчас ${formatQty(item.stock)} ${item.unit}`
-      ),
-    ].join("\n");
-  };
-
-  const addToShoppingList = async () => {
-    const text = shoppingText();
-    try {
-      await navigator.clipboard.writeText(text);
-      showToast("Список покупок готов", "Скопирован в буфер обмена");
-    } catch {
-      showToast("Список покупок", text);
+    if (low.length === 0) {
+      showToast("Докупать нечего", "Все запасы выше минимального порога");
+      return;
     }
+    const { added } = addShoppingItems(
+      low.map((item) => {
+        const need = usage.get(item.name) ?? 0;
+        return {
+          name: item.name,
+          qty: need > 0 ? need : null,
+          unit: item.unit,
+          source: "Низкий остаток в запасах",
+        };
+      })
+    );
+    showToast(
+      added > 0
+        ? `В списке покупок: +${added} ${pluralRu(added, "позиция", "позиции", "позиций")}`
+        : "Эти позиции уже в списке",
+      "Кнопка «Покупки» — в шапке сверху"
+    );
   };
 
   return (
@@ -263,7 +268,7 @@ export function InventoryClient({ items }: { items: StockItem[] }) {
       <button
         type="button"
         onClick={addToShoppingList}
-        aria-label="Добавить в список покупок"
+        aria-label="Добавить низкие остатки в список покупок"
         className="fixed bottom-24 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-clay text-paper shadow-soft transition hover:bg-[#B06A48] active:scale-95 md:bottom-8 md:right-8"
       >
         <span className="relative">

@@ -11,9 +11,11 @@ import {
   Hammer,
   Heart,
   Share2,
+  ShoppingCart,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { readFavoriteIds, toggleFavoriteId } from "@/lib/favorites";
+import { addShoppingItems } from "@/lib/shopping-list";
 import { useToast } from "@/components/toast";
 import { categoryIcon, DIFFICULTY_STYLES } from "../../_components/catalog-visuals";
 import { MasterModeOverlay } from "./master-mode-overlay";
@@ -55,6 +57,19 @@ export function DetailClient({ item }: { item: CatalogItem }) {
     } catch {
       toast("Не удалось поделиться", "Скопируйте адрес страницы из строки браузера");
     }
+  };
+
+  const onAddMaterials = () => {
+    const { added } = addShoppingItems(
+      item.materials.map((material) => ({
+        name: material,
+        source: item.title,
+      }))
+    );
+    toast(
+      added > 0 ? `В списке покупок: +${added}` : "Материалы уже в списке",
+      "Кнопка «Покупки» — в шапке сверху"
+    );
   };
 
   const Icon = categoryIcon(item.category);
@@ -207,6 +222,16 @@ export function DetailClient({ item }: { item: CatalogItem }) {
               <Share2 aria-hidden className="h-4 w-4" />
               Поделиться
             </button>
+            {item.materials.length > 0 && (
+              <button
+                type="button"
+                onClick={onAddMaterials}
+                className="inline-flex items-center gap-1.5 rounded-full bg-white px-4 py-2 text-sm font-semibold text-ink shadow-card ring-1 ring-ink/10 transition-colors hover:bg-clay-soft hover:text-[#8A4A2C]"
+              >
+                <ShoppingCart aria-hidden className="h-4 w-4" />
+                В список покупок
+              </button>
+            )}
           </div>
 
           <div className="space-y-2 rounded-2xl bg-white p-4 shadow-card ring-1 ring-ink/5">
