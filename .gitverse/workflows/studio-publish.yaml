@@ -1,0 +1,31 @@
+# Managed by studio-bff — rewritten on every publish, local edits are lost.
+#
+# The build runs here, in your own repository, so its minutes are billed to you.
+# Everything it does is in the workflow this file calls.
+
+name: studio-publish
+
+on:
+  workflow_dispatch:
+    inputs:
+      correlation:     { description: "Publish run token", required: true, type: string }
+      image_name:      { description: "Image repository name inside the registry", required: true, type: string }
+      image_tag:       { description: "Image tag (pinned commit, short)", required: true, type: string }
+      callback_url:    { description: "BFF endpoint the result is reported to", required: true, type: string }
+      push_token_url:  { description: "BFF endpoint the registry token is drawn from", required: true, type: string }
+      project_commit:  { description: "Commit to build", required: true, type: string }
+      ar_host:         { description: "Registry host <registry>.cr.cloud.ru", required: true, type: string }
+
+jobs:
+  build:
+    # Without its own runner label a calling job waits forever.
+    runs-on: ubuntu-latest
+    uses: gitverse/studio-workflows/.gitverse/workflows/publish-build.yaml@master
+    with:
+      correlation:     ${{ inputs.correlation }}
+      image_name:      ${{ inputs.image_name }}
+      image_tag:       ${{ inputs.image_tag }}
+      callback_url:    ${{ inputs.callback_url }}
+      push_token_url:  ${{ inputs.push_token_url }}
+      project_commit:  ${{ inputs.project_commit }}
+      ar_host:         ${{ inputs.ar_host }}
