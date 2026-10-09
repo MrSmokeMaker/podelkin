@@ -5,6 +5,7 @@ import {
   type Craft,
   type Difficulty,
   type Material,
+  type StockItem,
 } from "@/data/mockData";
 
 export { crafts, inventory };
@@ -52,8 +53,50 @@ export function craftCost(craft: Craft): number {
   return craft.materials.reduce((sum, m) => sum + m.qty * m.price, 0);
 }
 
+const normalizeName = (s: string) =>
+  s
+    .toLowerCase()
+    .replace(/ё/g, "е")
+    .replace(/[^a-zа-я0-9]+/g, " ")
+    .trim();
+
+const nameWords = (s: string) =>
+  new Set(normalizeName(s).split(" ").filter(Boolean));
+
+/* Материалы из внешних источников (AI, импорт) приходят свободным текстом,
+   поэтому кроме точного совпадения допускаем совпадение по набору слов
+   и вложению названия (короткое из 2+ слов, чтобы «бумага» не совпала
+   со всеми запасами сразу). Не нашли — считаем, что в запасах пусто. */
+export function findStockItem(name: string): StockItem | undefined {
+  const exact = inventory.find((i) => i.name === name);
+  if (exact) return exact;
+  const target = nameWords(name);
+  if (target.size === 0) return undefined;
+  for (const item of inventory) {
+    const words = nameWords(item.name);
+    if (words.size === target.size && [...target].every((w) => words.has(w))) {
+      return item;
+    }
+  }
+  if (target.size >= 2) {
+    for (const item of inventory) {
+      const words = nameWords(item.name);
+      if (words.size > target.size && [...target].every((w) => words.has(w))) {
+        return item;
+      }
+    }
+    for (const item of inventory) {
+      const words = nameWords(item.name);
+      if (words.size >= 2 && [...words].every((w) => target.has(w))) {
+        return item;
+      }
+    }
+  }
+  return undefined;
+}
+
 export function stockOf(name: string): number {
-  return inventory.find((i) => i.name === name)?.stock ?? 0;
+  return findStockItem(name)?.stock ?? 0;
 }
 
 export interface MissingItem {
