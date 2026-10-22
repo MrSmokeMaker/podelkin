@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getAuthUser } from "@/lib/auth";
 import { PLAN_LABELS } from "@/lib/feature-flags";
-import { boards, crafts, inventory, projects } from "@/lib/db";
+import { listBoards, listCrafts, listInventory, listProjects } from "@/lib/db-server";
 import { collectCost } from "@/lib/cost-calculator";
 import { craftMinutes, formatMinutes, formatRub } from "@/lib/crafts";
 
@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 /* GET /api/export/summary.txt — базовая сводка мастерской, доступна всем тарифам */
 
-export function GET(request: Request) {
+export async function GET(request: Request) {
   const user = getAuthUser(request);
   if (!user.features.allowed.includes("exportTxt")) {
     return NextResponse.json(
@@ -18,16 +18,23 @@ export function GET(request: Request) {
     );
   }
 
-  const totalCrafts = crafts.length;
+  const [allCrafts, allInventory, allProjects, allBoards] = await Promise.all([
+    listCrafts(),
+    listInventory(),
+    listProjects(),
+    listBoards(),
+  ]);
+  const totalCrafts = allCrafts.length;
+
   const avgTime = Math.round(
-    crafts.reduce((sum, craft) => sum + craftMinutes(craft), 0) / totalCrafts
+    allCrafts.reduce((sum, craft) => sum + craftMinutes(craft), 0) / totalCrafts
   );
   const avgCost =
-    crafts.reduce((sum, craft) => sum + collectCost(craft).baseCost, 0) /
+    allCrafts.reduce((sum, craft) => sum + collectCost(craft).baseCost, 0) /
     totalCrafts;
 
   const usage = new Map<string, number>();
-  for (const craft of crafts) {
+  for (const craft of allCrafts) {
     for (const material of craft.materials) {
       usage.set(material.name, (usage.get(material.name) ?? 0) + 1);
     }
@@ -48,12 +55,12 @@ export function GET(request: Request) {
       : "Самый ходовой материал: —",
     "",
     "ЗАПАСЫ",
-    `Позиций: ${inventory.length}, пустых: ${inventory.filter((i) => i.stock === 0).length}`,
+    `Позиций: ${allInventory.length}, пустых: ${allInventory.filter((i) => i.stock === 0).length}`,
     "",
     "ПРОЕКТЫ",
-    `Всего: ${projects.length} · в работе: ${projects.filter((p) => p.status === "в работе").length} · готовых: ${projects.filter((p) => p.status === "готов").length}`,
+    `Всего: ${allProjects.length} · в работе: ${allProjects.filter((p) => p.status === "в работе").length} · готовых: ${allProjects.filter((p) => p.status === "готов").length}`,
     "",
-    `ДОСКИ: ${boards.length}`,
+    `ДОСКИ: ${allBoards.length}`,
     "",
     "—",
     "Базовая сводка тарифа «Базовый».",

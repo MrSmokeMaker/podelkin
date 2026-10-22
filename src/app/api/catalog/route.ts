@@ -8,8 +8,11 @@ import {
   startBulkImportIfNeeded,
 } from "@/server/services/sourceBulk";
 import {
-  catalogItems,
+  listCatalogItems,
+  findCatalogItemBySourceUrl,
   createCatalogItem,
+} from "@/lib/catalog-db-server";
+import {
   CATALOG_CATEGORIES,
   CATALOG_DIFFICULTIES,
   type CatalogCategory,
@@ -28,13 +31,14 @@ const THUMB_EXT: Record<string, string> = {
 };
 const MAX_THUMB_BYTES = 5 * 1024 * 1024;
 
-export function GET() {
+export async function GET() {
   // Первый запрос каталога запускает фоновую автозагрузку из источников;
   // importing говорит клиенту, что список стоит обновить чуть позже.
   startBulkImportIfNeeded();
+  const items = await listCatalogItems();
   return NextResponse.json({
-    total: catalogItems.length,
-    items: catalogItems,
+    total: items.length,
+    items: items,
     importing: isBulkImporting(),
   });
 }
@@ -144,7 +148,7 @@ export async function POST(request: Request) {
     thumbnail = `/img/${filename}`;
   }
 
-  const item = createCatalogItem({
+  const item = await createCatalogItem({
     title,
     category: category as CatalogCategory,
     sourceUrl,
@@ -182,8 +186,8 @@ async function importFromSourcePage(request: Request) {
     );
   }
 
-  // Повторный импорт той же страницы не плодит дубликаты в каталоге.
-  const existing = catalogItems.find((item) => item.sourceUrl === parsed.href);
+  // Повторный импорт той же страницы не создаёт копию в каталоге.
+  const existing = await findCatalogItemBySourceUrl(parsed.href);
   if (existing) {
     return NextResponse.json({ item: existing, existing: true });
   }
@@ -208,7 +212,7 @@ async function importFromSourcePage(request: Request) {
   const difficulty: CatalogDifficulty =
     stepCount >= 8 ? "сложно" : stepCount > 0 && stepCount <= 4 ? "легко" : "средне";
 
-  const item = createCatalogItem({
+  const item = await createCatalogItem({
     title: imported.title,
     category: imported.category,
     sourceUrl: parsed.href,

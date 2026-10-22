@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import { getAuthUser } from "@/lib/auth";
 import { PLAN_LABELS, formatLimit } from "@/lib/feature-flags";
-import { crafts, createProject, projects } from "@/lib/db";
+import { listCrafts, listProjects, createProject } from "@/lib/db-server";
 
 export const dynamic = "force-dynamic";
 
-export function GET() {
-  return NextResponse.json({ total: projects.length, projects });
+export async function GET() {
+  const allProjects = await listProjects();
+  return NextResponse.json({ total: allProjects.length, projects: allProjects });
 }
 
 export async function POST(request: Request) {
@@ -27,7 +28,8 @@ export async function POST(request: Request) {
     );
   }
 
-  const craft = crafts.find((c) => c.slug === craftSlug);
+  const allCrafts = await listCrafts();
+  const craft = allCrafts.find((c) => c.slug === craftSlug);
   if (!craft) {
     return NextResponse.json(
       { error: `Мастер-класс «${craftSlug}» не найден` },
@@ -35,9 +37,10 @@ export async function POST(request: Request) {
     );
   }
 
-  /* Лимит тарифа считает только «в работе» проекты пользователя. */
-  const activeCount = projects.filter(
-    (p) => p.status === "в работе" && p.ownerId === user.id
+  /* Лимит тарифа считает проекты «в работе». */
+  const allProjects = await listProjects();
+  const activeCount = allProjects.filter(
+    (p) => p.status === "в работе"
   ).length;
   if (activeCount >= user.projectLimit) {
     return NextResponse.json(
@@ -50,6 +53,6 @@ export async function POST(request: Request) {
     );
   }
 
-  const project = createProject(craft, user.id);
+  const project = await createProject(craft);
   return NextResponse.json({ project }, { status: 201 });
 }

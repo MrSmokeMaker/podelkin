@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { findProject } from "@/lib/db";
+import { findProject } from "@/lib/db-server";
 
 export const dynamic = "force-dynamic";
 
@@ -8,7 +8,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const project = findProject(id);
+  const project = await findProject(id);
   if (!project) {
     return NextResponse.json(
       { error: `Проект «${id}» не найден` },

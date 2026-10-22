@@ -1,5 +1,6 @@
 import type { Category, Craft, Difficulty } from "@/data/mockData";
-import { crafts, synonyms } from "@/lib/db";
+import { synonyms } from "@/lib/db";
+import { listCrafts } from "@/lib/db-server";
 import { collectCost } from "@/lib/cost-calculator";
 import { craftMinutes } from "@/lib/crafts";
 
@@ -84,7 +85,8 @@ export interface SearchResponse {
   facets: SearchFacets;
 }
 
-export function searchCrafts(params: SearchParams): SearchResponse {
+export async function searchCrafts(params: SearchParams): Promise<SearchResponse> {
+  const crafts = await listCrafts();
   const tokens = expandTokens(tokenize(params.q ?? ""));
 
   /* Фасеты считаются по текстовому совпадению, до фильтров категории/сложности.

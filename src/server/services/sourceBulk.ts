@@ -1,8 +1,10 @@
 import { decodeEntities, fetchSourceHtml } from "./sourceFetcher";
 import { importCraftFromSource } from "./sourceImport";
 import {
-  catalogItems,
+  findCatalogItemBySourceUrl,
   createCatalogItem,
+} from "@/lib/catalog-db-server";
+import {
   type CatalogDifficulty,
 } from "@/lib/catalog-db";
 
@@ -49,7 +51,7 @@ async function runBulkImport(): Promise<void> {
   for (const url of candidates) {
     if (imported >= BULK_MAX_ITEMS || Date.now() > deadline) break;
     // Ручной импорт мог уже добавить эту страницу — не плодим дубликаты.
-    if (catalogItems.some((item) => item.sourceUrl === url)) continue;
+    if (await findCatalogItemBySourceUrl(url)) continue;
 
     try {
       const data = await importCraftFromSource(new URL(url));
@@ -59,7 +61,7 @@ async function runBulkImport(): Promise<void> {
           : data.instructions.length > 0 && data.instructions.length <= 4
             ? "легко"
             : "средне";
-      createCatalogItem({
+      await createCatalogItem({
         title: data.title,
         category: data.category,
         sourceUrl: url,

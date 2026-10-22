@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { countGenerationsToday } from "@/lib/db";
+import { countGenerationsToday } from "@/lib/db-server";
 import {
   BOARD_LIMITS,
   GENERATION_LIMITS,
@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
     },
     remainingGenerations: Math.max(
       0,
-      GENERATION_LIMITS[role] - countGenerationsToday(stored?.id ?? "guest")
+      GENERATION_LIMITS[role] - await countGenerationsToday(stored?.id ?? "guest")
     ),
   });
 }

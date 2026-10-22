@@ -6,7 +6,7 @@ import {
   createAiDraft,
   findCachedAiDraft,
   registerGeneration,
-} from "@/lib/db";
+} from "@/lib/db-server";
 import {
   generateCraftDraft,
   normalizeTopic,
@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
   const perDay = user.generationLimit;
 
   // Лимит проверяем ДО обращения к ИИ — платные вызовы не тратятся впустую.
-  if (countGenerationsToday(user.id) >= perDay) {
+  if (await countGenerationsToday(user.id) >= perDay) {
     return NextResponse.json(
       {
         error: `Дневной лимит генераций тарифа «${PLAN_LABELS[user.role]}» исчерпан (${perDay}/день). Оформите тариф выше, чтобы генерировать больше.`,
@@ -102,10 +102,10 @@ export async function POST(request: NextRequest) {
 
     // Попадание в кэш не тратит квоту — списываем только за генерацию.
     if (!result.cached) {
-      registerGeneration(user.id);
+      await registerGeneration(user.id);
     }
 
-    const draft = createAiDraft({
+    const draft = await createAiDraft({
       topic: topicKey,
       normalizedTopic: normalizeTopic(topicKey),
       payload: result.data,
@@ -117,7 +117,7 @@ export async function POST(request: NextRequest) {
         draftId: draft.id,
         data: result.data,
         provider: result.provider,
-        remainingQuota: Math.max(0, perDay - countGenerationsToday(user.id)),
+        remainingQuota: Math.max(0, perDay - await countGenerationsToday(user.id)),
         cached: Boolean(result.cached),
       },
       { status: 201 }

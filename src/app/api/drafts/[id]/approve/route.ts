@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
-  aiStats,
   attachImageToCraft,
+  bumpAiStat,
   createAiCraft,
   findAiDraft,
   imageAssetStore,
   markAiDraftApproved,
-} from "@/lib/db";
+} from "@/lib/db-server";
 import type { CraftDraftData } from "@/server/services/craftDraft";
 import { getOrCreateAsset } from "@/server/services/imageCache";
 
@@ -17,7 +17,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const draft = findAiDraft(id);
+  const draft = await findAiDraft(id);
 
   if (!draft || !draft.valid) {
     return NextResponse.json({ error: "Черновик не найден" }, { status: 404 });
@@ -32,7 +32,7 @@ export async function POST(
   const payload = draft.payload as CraftDraftData;
 
   // Поделка создаётся сразу: сбой картинки не должен терять одобренный текст.
-  const craft = createAiCraft({
+  const craft = await createAiCraft({
     title: payload.title,
     summary: payload.summary,
     category: payload.category,
@@ -52,18 +52,18 @@ export async function POST(
       imageAssetStore
     );
     // seed берётся из ассета: при попадании в кэш переиспользуется, не пересеивается.
-    attachImageToCraft(craft.id, {
+    await attachImageToCraft(craft.id, {
       imageSeed: asset.seed,
       assetId: asset.id,
       imageUrl: asset.fileUrl ?? "",
     });
     if (fromCache) {
-      aiStats.cacheHits += 1;
+      await bumpAiStat("cacheHits");
     } else {
-      aiStats.cacheMisses += 1;
-      aiStats.imageRenders += 1;
+      await bumpAiStat("cacheMisses");
+      await bumpAiStat("imageRenders");
     }
-    markAiDraftApproved(draft.id, craft.id);
+    await markAiDraftApproved(draft.id, craft.id);
     return NextResponse.json(
       {
         craftId: craft.id,
@@ -73,8 +73,8 @@ export async function POST(
       { status: 201 }
     );
   } catch {
-    aiStats.cacheMisses += 1;
-    markAiDraftApproved(draft.id, craft.id);
+    await bumpAiStat("cacheMisses");
+    await markAiDraftApproved(draft.id, craft.id);
     return NextResponse.json(
       {
         craftId: craft.id,

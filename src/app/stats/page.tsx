@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
 import { Boxes, Coins, Hammer, Timer } from "lucide-react";
-import { crafts } from "@/lib/db";
+import { listCrafts } from "@/lib/db-server";
 import { collectCost } from "@/lib/cost-calculator";
 import { craftMinutes, formatMinutes, formatRub } from "@/lib/crafts";
 import { StatsAdvanced } from "./_components/stats-advanced";
 import { AiInsights } from "./_components/ai-insights";
+
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Статистика",
@@ -17,7 +19,8 @@ export const metadata: Metadata = {
    «Базовый» видит его с бейджем и заблокированными контролами.
    ИИ-аналитика (Директор) — отдельный блок AiInsights ниже. */
 
-export default function StatsPage() {
+export default async function StatsPage() {
+  const crafts = await listCrafts();
   const totalCrafts = crafts.length;
   const avgTime = Math.round(
     crafts.reduce((sum, craft) => sum + craftMinutes(craft), 0) / totalCrafts

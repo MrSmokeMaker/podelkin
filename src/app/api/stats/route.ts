@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { Difficulty } from "@/data/mockData";
 import { getAuthUser } from "@/lib/auth";
-import { crafts, inventory } from "@/lib/db";
+import { listCrafts, listInventory } from "@/lib/db-server";
 import { collectCost } from "@/lib/cost-calculator";
 import { craftMinutes } from "@/lib/crafts";
 
@@ -13,18 +13,20 @@ export const dynamic = "force-dynamic";
 
 const DIFFICULTIES: Difficulty[] = ["Легко", "Средне", "Сложно"];
 
-export function GET(request: Request) {
+export async function GET(request: Request) {
   const user = getAuthUser(request);
-  const totalCrafts = crafts.length;
+  const allCrafts = await listCrafts();
+  const allInventory = await listInventory();
+  const totalCrafts = allCrafts.length;
 
   const avgTime = Math.round(
-    crafts.reduce((sum, craft) => sum + craftMinutes(craft), 0) / totalCrafts
+    allCrafts.reduce((sum, craft) => sum + craftMinutes(craft), 0) / totalCrafts
   );
-  const costs = crafts.map((craft) => collectCost(craft));
+  const costs = allCrafts.map((craft) => collectCost(craft));
   const avgCost = costs.reduce((sum, cost) => sum + cost.baseCost, 0) / totalCrafts;
 
   const usage = new Map<string, number>();
-  for (const craft of crafts) {
+  for (const craft of allCrafts) {
     for (const material of craft.materials) {
       usage.set(material.name, (usage.get(material.name) ?? 0) + 1);
     }
@@ -48,7 +50,7 @@ export function GET(request: Request) {
 
   const costByCategory = new Map<string, number>();
   const timeByDifficulty = new Map<Difficulty, number>();
-  for (const craft of crafts) {
+  for (const craft of allCrafts) {
     costByCategory.set(
       craft.category,
       (costByCategory.get(craft.category) ?? 0) + collectCost(craft).baseCost
@@ -60,9 +62,9 @@ export function GET(request: Request) {
   }
 
   let savingsEstimate = 0;
-  for (const craft of crafts) {
+  for (const craft of allCrafts) {
     for (const material of craft.materials) {
-      const stock = inventory.find((i) => i.name === material.name)?.stock ?? 0;
+      const stock = allInventory.find((i) => i.name === material.name)?.stock ?? 0;
       savingsEstimate += Math.min(stock, material.qty) * material.price;
     }
   }

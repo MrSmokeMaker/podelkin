@@ -11,8 +11,10 @@ import {
   Smartphone,
   Sparkles,
 } from "lucide-react";
-import { aiCrafts, boards, crafts, inventory, projects } from "@/lib/db";
+import { listBoards, listCrafts, listInventory, listProjects } from "@/lib/db-server";
 import { ProfileCard } from "./_components/profile-card";
+
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Профиль",
@@ -45,7 +47,13 @@ const settingsLinks = [
   },
 ];
 
-export default function ProfilePage() {
+export default async function ProfilePage() {
+  const [allCrafts, projects, boards, inventory] = await Promise.all([
+    listCrafts(),
+    listProjects(),
+    listBoards(),
+    listInventory(),
+  ]);
   const inProgress = projects.filter((p) => p.status === "в работе").length;
   const done = projects.filter((p) => p.status === "готов").length;
 
@@ -78,7 +86,7 @@ export default function ProfilePage() {
       icon: Heart,
       tint: "bg-blush-soft text-[#8A4A5C]",
       label: "Мастер-классов всего",
-      value: String(crafts.length + aiCrafts.length),
+      value: String(allCrafts.length),
     },
   ];
 

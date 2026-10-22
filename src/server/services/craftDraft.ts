@@ -71,7 +71,7 @@ export function normalizeTopic(topic: string): string {
  */
 export async function generateCraftDraft(
   input: CraftGenerationInput,
-  findCachedDraft?: (normalizedTopic: string) => CraftDraftRow | null | Promise<CraftDraftRow | null>
+  findCachedDraft?: (normalizedTopic: string) => DraftCacheRow | null | Promise<DraftCacheRow | null>
 ): Promise<CraftDraftResult> {
   const cacheEnabled = process.env.CACHE_LLM === "true";
 

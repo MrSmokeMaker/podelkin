@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { deleteInventoryItem } from "@/lib/db";
+import { deleteInventoryItem } from "@/lib/db-server";
 
 export const dynamic = "force-dynamic";
 
@@ -8,7 +8,8 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  if (!deleteInventoryItem(id)) {
+  const deleted = await deleteInventoryItem(id);
+  if (!deleted) {
     return NextResponse.json(
       { error: `Позиция запасов «${id}» не найдена` },
       { status: 404 }

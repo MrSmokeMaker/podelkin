@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAuthUser } from "@/lib/auth";
-import { crafts, projects } from "@/lib/db";
+import { listCrafts, listProjects } from "@/lib/db-server";
 import { collectCost } from "@/lib/cost-calculator";
 
 export const dynamic = "force-dynamic";
@@ -19,7 +19,7 @@ function csvRow(cells: (string | number)[]): string {
   return cells.map(csvCell).join(SEP);
 }
 
-export function GET(request: Request) {
+export async function GET(request: Request) {
   const user = getAuthUser(request);
   if (!user.features.allowed.includes("exportCsv")) {
     return NextResponse.json(
@@ -31,14 +31,19 @@ export function GET(request: Request) {
     );
   }
 
+  const [allCrafts, allProjects] = await Promise.all([
+    listCrafts(),
+    listProjects(),
+  ]);
+
   const rows: string[] = [];
 
   /* Время по шагам проектов: план (МК) против факта (записанное время) */
   rows.push(
     csvRow(["Проект", "Поделка", "Шаг", "План, мин", "Факт, мин", "Отклонение, мин"])
   );
-  for (const project of projects) {
-    const craft = crafts.find((c) => c.slug === project.craftSlug);
+  for (const project of allProjects) {
+    const craft = allCrafts.find((c) => c.slug === project.craftSlug);
     if (!craft) continue;
     project.steps.forEach((step, i) => {
       const planned = craft.steps[i]?.minutes ?? 0;
@@ -68,7 +73,7 @@ export function GET(request: Request) {
       "Дата цены",
     ])
   );
-  for (const craft of crafts) {
+  for (const craft of allCrafts) {
     for (const source of collectCost(craft).sources) {
       rows.push(
         csvRow([

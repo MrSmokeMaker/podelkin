@@ -1,18 +1,20 @@
 import { NextResponse } from "next/server";
 import { getAuthUser } from "@/lib/auth";
 import { PLAN_LABELS } from "@/lib/feature-flags";
-import { boards, crafts } from "@/lib/db";
+import { listBoards, listCrafts, createBoard } from "@/lib/db-server";
 
 export const dynamic = "force-dynamic";
 
 /* Доски настроения. Лимиты по тарифу: Базовый — 3, Премиум — 20, Директор — 100. */
 
-export function GET(request: Request) {
+export async function GET(request: Request) {
   const user = getAuthUser(request);
-  const withTitles = boards.map((board) => ({
+  const allBoards = await listBoards();
+  const allCrafts = await listCrafts();
+  const withTitles = allBoards.map((board) => ({
     ...board,
     craftTitles: board.craftSlugs.map(
-      (slug) => crafts.find((c) => c.slug === slug)?.title ?? slug
+      (slug) => allCrafts.find((c) => c.slug === slug)?.title ?? slug
     ),
   }));
   return NextResponse.json({
@@ -41,7 +43,7 @@ export async function POST(request: Request) {
     );
   }
 
-  if (boards.length >= user.boardLimit) {
+  if ((await listBoards()).length >= user.boardLimit) {
     return NextResponse.json(
       {
         error:
@@ -53,11 +55,6 @@ export async function POST(request: Request) {
     );
   }
 
-  const board = {
-    id: `board-${Date.now().toString(36)}`,
-    title,
-    craftSlugs: [] as string[],
-  };
-  boards.push(board);
+  const board = await createBoard({ title, craftSlugs: [] });
   return NextResponse.json({ board }, { status: 201 });
 }

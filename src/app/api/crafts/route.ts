@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
 
 const SORTS: SortMode[] = ["relevance", "time", "cost"];
 
-export function GET(request: Request) {
+export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
 
   const q = searchParams.get("q") ?? "";
@@ -25,6 +25,6 @@ export function GET(request: Request) {
     ? (sortParam as SortMode)
     : "relevance";
 
-  const response = searchCrafts({ q, category, difficulty, maxTimeMin, sort });
+  const response = await searchCrafts({ q, category, difficulty, maxTimeMin, sort });
   return NextResponse.json(response);
 }

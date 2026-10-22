@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAuthUser } from "@/lib/auth";
-import { aiStats } from "@/lib/db";
+import { getAiStats } from "@/lib/db-server";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +22,8 @@ export async function GET(request: Request) {
     );
   }
 
-  const { llmCalls, imageRenders, cacheHits, cacheMisses } = aiStats;
+  const stats = await getAiStats();
+  const { llmCalls, imageRenders, cacheHits, cacheMisses } = stats;
   const denominator = cacheHits + cacheMisses;
 
   const dailyQuota = Number(process.env.IMAGE_QUOTA_PER_DAY) || DEFAULT_IMAGE_QUOTA;

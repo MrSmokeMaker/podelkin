@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { crafts, findProject } from "@/lib/db";
+import { findProject, listCrafts, saveProject } from "@/lib/db-server";
 
 export const dynamic = "force-dynamic";
 
@@ -9,7 +9,7 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const project = findProject(id);
+  const project = await findProject(id);
   if (!project) {
     return NextResponse.json(
       { error: `Проект «${id}» не найден` },
@@ -63,13 +63,16 @@ export async function PUT(
   step.done = done ?? true;
   if (minutesSpent) step.minutesSpent += minutesSpent;
 
-  const craft = crafts.find((c) => c.slug === project.craftSlug);
+  const allCrafts = await listCrafts();
+  const craft = allCrafts.find((c) => c.slug === project.craftSlug);
   const allDone = project.steps.every((s) => s.done);
   project.status =
     allDone && (craft ? project.steps.length === craft.steps.length : true)
       ? "готов"
       : "в работе";
   project.updatedAt = new Date().toISOString();
+
+  await saveProject(project);
 
   return NextResponse.json({ project });
 }

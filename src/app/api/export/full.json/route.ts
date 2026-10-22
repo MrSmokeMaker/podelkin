@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getAuthUser } from "@/lib/auth";
-import { boards, crafts, inventory, projects } from "@/lib/db";
+import { listBoards, listCrafts, listInventory, listProjects } from "@/lib/db-server";
 
 export const dynamic = "force-dynamic";
 
@@ -14,13 +14,20 @@ export async function GET(request: Request) {
     );
   }
 
+  const [allCrafts, allInventory, allProjects, allBoards] = await Promise.all([
+    listCrafts(),
+    listInventory(),
+    listProjects(),
+    listBoards(),
+  ]);
+
   const payload = {
     generatedAt: new Date().toISOString(),
     tariff: user.role,
-    crafts,
-    inventory,
-    projects,
-    boards,
+    crafts: allCrafts,
+    inventory: allInventory,
+    projects: allProjects,
+    boards: allBoards,
   };
 
   return new NextResponse(JSON.stringify(payload, null, 2), {

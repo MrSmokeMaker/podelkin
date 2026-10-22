@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import type { Craft } from "@/data/mockData";
-import { crafts, inventory } from "@/lib/db";
+import { listCrafts, listInventory } from "@/lib/db-server";
 
 export const dynamic = "force-dynamic";
 
@@ -40,7 +40,7 @@ interface MissingItem {
   cost: number;
 }
 
-function coverageFor(craft: Craft) {
+function coverageFor(craft: Craft, inventory: { name: string; stock: number; unit: string }[]) {
   const missingItems: MissingItem[] = [];
   let missingTotal = 0;
 
@@ -65,10 +65,11 @@ function coverageFor(craft: Craft) {
   return { missingItems, missingTotal: Math.round(missingTotal * 100) / 100 };
 }
 
-export function GET() {
+export async function GET() {
+  const [crafts, inventory] = await Promise.all([listCrafts(), listInventory()]);
   const results = crafts
     .map((craft) => {
-      const { missingItems, missingTotal } = coverageFor(craft);
+      const { missingItems, missingTotal } = coverageFor(craft, inventory);
       return {
         slug: craft.slug,
         title: craft.title,

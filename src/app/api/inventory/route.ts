@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
-import { inventory, upsertInventoryItem } from "@/lib/db";
+import { listInventory, upsertInventoryItem } from "@/lib/db-server";
 
 export const dynamic = "force-dynamic";
 
-export function GET() {
-  return NextResponse.json({ total: inventory.length, items: inventory });
+export async function GET() {
+  const items = await listInventory();
+  return NextResponse.json({ total: items.length, items: items });
 }
 
 export async function POST(request: Request) {
@@ -40,6 +41,6 @@ export async function POST(request: Request) {
     );
   }
 
-  const item = upsertInventoryItem(name.trim(), stock, unit.trim());
+  const item = await upsertInventoryItem(name.trim(), stock, unit.trim());
   return NextResponse.json({ item }, { status: 201 });
 }
