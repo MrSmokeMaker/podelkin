@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
 }
 
 /* 1001zagotovka.ru — OpenCart интернет-магазин заготовок.
-   Настоящий URL поиска: /index.php?route=product/search&search=... */
+   URL поиска: /index.php?route=product/search&search=... */
 async function search1001Zagotovka(query: string): Promise<Suggestion[]> {
   const url = `https://1001zagotovka.ru/index.php?route=product/search&search=${encodeURIComponent(query)}`;
   const res = await fetch(url, {
@@ -69,7 +69,6 @@ async function search1001Zagotovka(query: string): Promise<Suggestion[]> {
   const out: Suggestion[] = [];
   const seen = new Set<string>();
 
-  // Ищем карточки товаров в выдаче OpenCart
   const regex = /<div class="product-thumb"[\s\S]*?<a itemprop="url" href="([^"]+)"[\s\S]*?alt="([^"]+)"/gi;
   let match: RegExpExecArray | null;
   while ((match = regex.exec(html)) !== null && out.length < RESULTS_PER_SITE) {
@@ -89,30 +88,37 @@ async function search1001Zagotovka(query: string): Promise<Suggestion[]> {
   return out;
 }
 
-/* only-paper.ru — DLE сайт бумажных моделей */
+/* only-paper.ru — uCoz каталог бумажных моделей.
+   URL поиска: https://only-paper.ru/search/?q=...&t=0
+   Результаты выводятся в блоках <div class="eTitle"><a href="...">...</a></div> */
 async function searchOnlyPaper(query: string): Promise<Suggestion[]> {
-  const url = `https://only-paper.ru/index.php?do=search&subaction=search&story=${encodeURIComponent(query)}`;
+  const url = `https://only-paper.ru/search/?q=${encodeURIComponent(query)}&t=0`;
   const res = await fetch(url, {
-    headers: { "User-Agent": USER_AGENT, Accept: "text/html" },
+    headers: {
+      "User-Agent": USER_AGENT,
+      Referer: "https://only-paper.ru/",
+      Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    },
     signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   });
 
-  if (!res.ok) return [];
+  if (!res.ok) throw new Error("only-paper failed");
   const html = await res.text();
 
   const out: Suggestion[] = [];
   const seen = new Set<string>();
 
-  const regex = /<h[1-4][^>]*>\s*<a\b[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi;
+  const regex = /<div class="eTitle"[^>]*>\s*<a\b[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi;
   let match: RegExpExecArray | null;
   while ((match = regex.exec(html)) !== null && out.length < RESULTS_PER_SITE) {
     const itemUrl = match[1];
     const rawTitle = decodeEntities(match[2].replace(/<[^>]+>/g, " ")).trim();
-    if (!itemUrl || rawTitle.length < 5 || seen.has(itemUrl)) continue;
+    if (!itemUrl || rawTitle.length < 3 || seen.has(itemUrl)) continue;
     seen.add(itemUrl);
 
+    const fullUrl = itemUrl.startsWith("http") ? itemUrl : `https://only-paper.ru${itemUrl}`;
     out.push({
-      url: itemUrl.startsWith("http") ? itemUrl : `https://only-paper.ru${itemUrl}`,
+      url: fullUrl,
       title: rawTitle,
       site: "only-paper.ru",
       siteLabel: "Only-Paper",
