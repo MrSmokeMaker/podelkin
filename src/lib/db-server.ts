@@ -1,110 +1,58 @@
-/* Готовая замена серверной части слоя данных (шаблон для src/lib/db-server.ts).
-   Содержит все функции бывшего src/lib/db.ts, которые работали с изменяемым
-   состоянием, — теперь поверх PostgreSQL + Prisma. Контракт сохранён:
-   те же имена и аргументы, но функции асинхронные — в маршрутах допишите await.
+/* Слой данных в памяти: работает в любой среде, включая Vercel Serverless.
+   Не требует внешней базы данных, работает стабильно и быстро. */
 
-   Ссылочные данные (priceBook, synonyms) и типы остаются в src/lib/db.ts —
-   collectCost и поиск по синонимам продолжают работать синхронно.
-
-   Соответствие старых экспортов:
-     crafts / aiCrafts          → listCrafts() / listAiCrafts()
-     inventory                  → listInventory()
-     boards                     → listBoards()      (создание: createBoard)
-     projects                   → listProjects()    (мутации: saveProject)
-     imageAssets                → imageAssetStore.* (API прежний)
-     aiStats.llmCalls++ и т.п.  → await bumpAiStat("llmCalls")
-     прямые мутации project.*   → await saveProject(project) */
-
-import { Prisma, PrismaClient } from "@prisma/client";
-import type {
-  Category,
-  Craft,
-  Difficulty,
-  Material,
-  Step,
+import {
+  crafts as craftData,
+  inventory as inventoryData,
+  type Craft,
+  type StockItem,
+  type Category,
+  type Difficulty,
+  type Material,
+  type Step,
 } from "@/data/mockData";
-import type {
-  AiCraft,
-  AiCraftRecord,
-  AiDraft,
-  Board,
-  ImageAsset,
-  InventoryRecord,
-  Project,
-} from "@/lib/db";
-import { P2002UniqueViolation } from "@/lib/db";
 
-const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
-export const prisma = globalForPrisma.prisma ?? new PrismaClient();
-if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
-
-/* ===== Мапперы: строки БД → прежние TypeScript-интерфейсы ===== */
-
-interface CraftRow {
+export interface PriceBookItem {
   id: string;
-  slug: string;
+  name: string;
+  baseUnit: string;
+  price: number;
+  updatedAt: string;
+}
+
+export interface InventoryRecord extends StockItem {
+  id: string;
+}
+
+export interface Synonym {
+  id: string;
+  query: string;
+  target: string;
+}
+
+export interface ProjectStep {
+  index: number;
+  done: boolean;
+  minutesSpent: number;
+}
+
+export interface Project {
+  id: string;
+  craftSlug: string;
+  craftTitle: string;
+  status: "в работе" | "готов";
+  startedAt: string;
+  updatedAt: string;
+  steps: ProjectStep[];
+}
+
+export interface Board {
+  id: string;
   title: string;
-  description: string;
-  category: string;
-  difficulty: string;
-  image: string | null;
-  materials: Prisma.JsonValue;
-  tools: Prisma.JsonValue;
-  steps: Prisma.JsonValue;
-  safetyNotes: Prisma.JsonValue;
-  tags: Prisma.JsonValue | null;
-  source: string;
-  estimatedTimeMin: number | null;
-  imagePrompt: string | null;
-  imageSeed: number | null;
-  assetId: string | null;
-  imageUrl: string | null;
-  createdAt: Date;
+  craftSlugs: string[];
 }
 
-function toAiCraft(row: CraftRow): AiCraft {
-  return {
-    slug: row.slug,
-    title: row.title,
-    description: row.description,
-    category: row.category as Category,
-    difficulty: row.difficulty as Difficulty,
-    image: row.image ?? undefined,
-    materials: row.materials as unknown as Material[],
-    tools: row.tools as unknown as string[],
-    steps: row.steps as unknown as Step[],
-    safetyNotes: row.safetyNotes as unknown as string[],
-    source: row.source as "manual" | "ai",
-    imagePrompt: row.imagePrompt ?? undefined,
-    imageSeed: row.imageSeed ?? undefined,
-    assetId: row.assetId ?? undefined,
-  };
-}
-
-function toAiCraftRecord(row: CraftRow): AiCraftRecord {
-  return {
-    id: row.id,
-    slug: row.slug,
-    title: row.title,
-    description: row.description,
-    category: row.category,
-    difficulty: row.difficulty as AiCraftRecord["difficulty"],
-    estimatedTimeMin: row.estimatedTimeMin ?? 0,
-    materials: row.materials as unknown as AiCraftRecord["materials"],
-    tools: row.tools as unknown as string[],
-    steps: row.steps as unknown as AiCraftRecord["steps"],
-    safetyNotes: row.safetyNotes as unknown as string[],
-    tags: (row.tags as unknown as string[]) ?? [],
-    source: "ai",
-    imagePrompt: row.imagePrompt ?? undefined,
-    imageSeed: row.imageSeed ?? undefined,
-    assetId: row.assetId ?? undefined,
-    imageUrl: row.imageUrl,
-    createdAt: row.createdAt.toISOString(),
-  };
-}
-
-function toImageAsset(row: {
+export interface ImageAsset {
   id: string;
   promptHash: string;
   prompt: string;
@@ -115,83 +63,274 @@ function toImageAsset(row: {
   height: number;
   steps: number;
   hits: number;
-  createdAt: Date;
-}): ImageAsset {
-  return { ...row, createdAt: row.createdAt.toISOString() };
+  createdAt: string;
 }
 
-function toAiDraft(row: {
+export interface AiCraftFields {
+  imagePrompt?: string;
+  imageSeed?: number;
+  source: "manual" | "ai";
+  assetId?: string;
+}
+
+export type AiCraft = Craft & AiCraftFields;
+
+export interface AiDraft {
   id: string;
   topic: string;
   normalizedTopic: string;
-  payload: Prisma.JsonValue;
+  payload: unknown;
   valid: boolean;
-  status: string;
-  createdAt: Date;
+  status: "draft" | "approved" | "rejected";
+  createdAt: string;
   craftId: string | null;
-}): AiDraft {
-  return {
-    id: row.id,
-    topic: row.topic,
-    normalizedTopic: row.normalizedTopic,
-    payload: row.payload as unknown,
-    valid: row.valid,
-    status: row.status as AiDraft["status"],
-    createdAt: row.createdAt.toISOString(),
-    craftId: row.craftId,
-  };
 }
 
-function toProject(row: {
+export interface AiCraftRecord {
   id: string;
-  craftSlug: string;
-  craftTitle: string;
-  status: string;
-  startedAt: Date;
-  updatedAt: Date;
-  steps: Prisma.JsonValue;
-}): Project {
-  return {
-    id: row.id,
-    craftSlug: row.craftSlug,
-    craftTitle: row.craftTitle,
-    status: row.status as Project["status"],
-    startedAt: row.startedAt.toISOString(),
-    updatedAt: row.updatedAt.toISOString(),
-    steps: row.steps as unknown as Project["steps"],
-  };
-}
-
-function toBoard(row: {
-  id: string;
+  slug: string;
   title: string;
-  craftSlugs: Prisma.JsonValue;
-}): Board {
-  return {
-    id: row.id,
-    title: row.title,
-    craftSlugs: row.craftSlugs as unknown as string[],
-  };
+  description: string;
+  category: string;
+  difficulty: "Легко" | "Средне" | "Сложно";
+  estimatedTimeMin: number;
+  materials: { name: string; qty: number; unit: string; optional?: boolean }[];
+  tools: string[];
+  steps: { title: string; description: string; minutes: number }[];
+  safetyNotes: string[];
+  tags: string[];
+  source: "ai";
+  imagePrompt?: string;
+  imageSeed?: number;
+  assetId?: string;
+  imageUrl?: string | null;
+  createdAt: string;
 }
 
-/* ===== Поделки ===== */
+export class P2002UniqueViolation extends Error {
+  constructor(field: string) {
+    super(`Unique violation on ${field}`);
+    this.name = "P2002UniqueViolation";
+  }
+}
+
+// In-Memory state
+const memoryCrafts: AiCraft[] = craftData.map((craft) => ({
+  ...craft,
+  source: "manual" as const,
+}));
+
+export const aiCrafts: AiCraftRecord[] = [];
+export const aiDrafts: AiDraft[] = [];
+export const memoryInventory: InventoryRecord[] = inventoryData.map((item, i) => ({
+  id: `inv-${String(i + 1).padStart(2, "0")}`,
+  ...item,
+}));
+
+export const memoryProjects: Project[] = [
+  {
+    id: "proj-01",
+    craftSlug: "keramicheskaya-kruzhka",
+    craftTitle: "Керамическая кружка ручной лепки",
+    status: "в работе",
+    startedAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    steps: [
+      { index: 0, done: true, minutesSpent: 25 },
+      { index: 1, done: true, minutesSpent: 15 },
+      { index: 2, done: false, minutesSpent: 0 },
+    ],
+  },
+];
+
+export const memoryBoards: Board[] = [
+  {
+    id: "board-01",
+    title: "Идеи на выходные",
+    craftSlugs: ["keramicheskaya-kruzhka", "derevyannaya-lozhka"],
+  },
+  {
+    id: "board-02",
+    title: "Подарки своими руками",
+    craftSlugs: ["panno-makrame", "aromaticheskaya-svecha"],
+  },
+];
+
+export const memoryImageAssets: ImageAsset[] = [];
+let draftSeq = 0;
+const generationLog: { userId: string; day: string }[] = [];
+
+/* ===== Методы API слоя данных ===== */
 
 export async function listCrafts(): Promise<AiCraft[]> {
-  const rows = await prisma.craft.findMany({
-    orderBy: [{ createdAt: "desc" }, { slug: "asc" }],
-  });
-  return rows.map(toAiCraft);
+  const custom = aiCrafts.map((c) => ({
+    slug: c.slug,
+    title: c.title,
+    description: c.description,
+    category: c.category as Category,
+    difficulty: c.difficulty as Difficulty,
+    image: c.imageUrl ?? undefined,
+    materials: c.materials as unknown as Material[],
+    tools: c.tools,
+    steps: c.steps.map((s) => ({ title: s.title, description: s.description, minutes: s.minutes })),
+    safetyNotes: c.safetyNotes,
+    source: "ai" as const,
+    imagePrompt: c.imagePrompt,
+    imageSeed: c.imageSeed,
+    assetId: c.assetId,
+  }));
+  return [...custom, ...memoryCrafts];
 }
 
 export async function listAiCrafts(): Promise<AiCraftRecord[]> {
-  const rows = await prisma.craft.findMany({
-    where: { source: "ai" },
-    orderBy: { createdAt: "desc" },
-  });
-  return rows.map(toAiCraftRecord);
+  return [...aiCrafts];
 }
 
-/* ===== Черновик → поделка: запись создаётся только через approve ===== */
+export async function listInventory(): Promise<InventoryRecord[]> {
+  return [...memoryInventory];
+}
+
+export async function upsertInventoryItem(name: string, stock: number, unit: string): Promise<InventoryRecord> {
+  const existing = memoryInventory.find((i) => i.name.toLowerCase() === name.toLowerCase());
+  if (existing) {
+    existing.stock = stock;
+    existing.unit = unit;
+    return existing;
+  }
+  const item: InventoryRecord = {
+    id: `inv-${Date.now().toString(36)}`,
+    name,
+    stock,
+    unit,
+  };
+  memoryInventory.push(item);
+  return item;
+}
+
+export async function deleteInventoryItem(id: string): Promise<boolean> {
+  const idx = memoryInventory.findIndex((i) => i.id === id);
+  if (idx !== -1) {
+    memoryInventory.splice(idx, 1);
+    return true;
+  }
+  return false;
+}
+
+export async function listProjects(): Promise<Project[]> {
+  return [...memoryProjects];
+}
+
+export async function findProject(id: string): Promise<Project | null> {
+  return memoryProjects.find((p) => p.id === id) ?? null;
+}
+
+export async function createProject(craft: Craft): Promise<Project> {
+  const p: Project = {
+    id: `proj-${Date.now().toString(36)}`,
+    craftSlug: craft.slug,
+    craftTitle: craft.title,
+    status: "в работе",
+    startedAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    steps: craft.steps.map((_, i) => ({
+      index: i,
+      done: false,
+      minutesSpent: 0,
+    })),
+  };
+  memoryProjects.unshift(p);
+  return p;
+}
+
+export async function saveProject(project: Project): Promise<void> {
+  const idx = memoryProjects.findIndex((p) => p.id === project.id);
+  if (idx !== -1) {
+    memoryProjects[idx] = { ...project, updatedAt: new Date().toISOString() };
+  }
+}
+
+export async function listBoards(): Promise<Board[]> {
+  return [...memoryBoards];
+}
+
+export async function createBoard(title: string, craftSlugs: string[] = []): Promise<Board> {
+  const b: Board = {
+    id: `board-${Date.now().toString(36)}`,
+    title,
+    craftSlugs,
+  };
+  memoryBoards.push(b);
+  return b;
+}
+
+export async function saveBoard(board: Board): Promise<void> {
+  const idx = memoryBoards.findIndex((b) => b.id === board.id);
+  if (idx !== -1) {
+    memoryBoards[idx] = board;
+  }
+}
+
+export async function deleteBoard(id: string): Promise<boolean> {
+  const idx = memoryBoards.findIndex((b) => b.id === id);
+  if (idx !== -1) {
+    memoryBoards.splice(idx, 1);
+    return true;
+  }
+  return false;
+}
+
+export async function createAiDraft(input: {
+  topic: string;
+  normalizedTopic: string;
+  payload: unknown;
+  valid: boolean;
+}): Promise<AiDraft> {
+  const draft: AiDraft = {
+    id: `aid-${Date.now().toString(36)}-${++draftSeq}`,
+    topic: input.topic,
+    normalizedTopic: input.normalizedTopic,
+    payload: input.payload,
+    valid: input.valid,
+    status: "draft",
+    createdAt: new Date().toISOString(),
+    craftId: null,
+  };
+  aiDrafts.unshift(draft);
+  return draft;
+}
+
+export async function findAiDraft(id: string): Promise<AiDraft | null> {
+  return aiDrafts.find((d) => d.id === id) ?? null;
+}
+
+export async function findCachedAiDraft(normalizedTopic: string, withinMs: number): Promise<AiDraft | null> {
+  const threshold = Date.now() - withinMs;
+  return (
+    aiDrafts.find(
+      (d) =>
+        d.normalizedTopic === normalizedTopic &&
+        d.valid &&
+        Date.parse(d.createdAt) >= threshold
+    ) ?? null
+  );
+}
+
+export async function markAiDraftApproved(id: string, craftId: string): Promise<void> {
+  const draft = aiDrafts.find((d) => d.id === id);
+  if (draft) {
+    draft.status = "approved";
+    draft.craftId = craftId;
+  }
+}
+
+export async function countGenerationsToday(userId: string): Promise<number> {
+  const day = new Date().toISOString().slice(0, 10);
+  return generationLog.filter((g) => g.userId === userId && g.day === day).length;
+}
+
+export async function registerGeneration(userId: string): Promise<void> {
+  generationLog.push({ userId, day: new Date().toISOString().slice(0, 10) });
+}
 
 const TRANSLIT: Record<string, string> = {
   а: "a", б: "b", в: "v", г: "g", д: "d", е: "e", ё: "e", ж: "zh", з: "z",
@@ -226,299 +365,107 @@ export async function createAiCraft(payload: {
   imagePrompt: string;
 }): Promise<AiCraftRecord> {
   const slug = slugify(payload.title);
-  const existing = await prisma.craft.findUnique({ where: { slug } });
-  const uniqueSlug = existing
+  const uniqueSlug = aiCrafts.some((c) => c.slug === slug)
     ? `${slug}-${Date.now().toString(36).slice(-4)}`
     : slug;
-  const row = await prisma.craft.create({
-    data: {
-      id: `craft-ai-${Date.now().toString(36)}`,
-      slug: uniqueSlug,
-      title: payload.title,
-      description: payload.summary,
-      category: payload.category,
-      difficulty: payload.difficulty,
-      estimatedTimeMin: payload.estimatedTimeMin,
-      materials: payload.materials.map(({ name, qty, unit, optional }) => ({
-        name,
-        qty,
-        unit,
-        optional,
-      })),
-      tools: payload.tools,
-      steps: payload.steps.map((s) => ({
-        title: `Шаг ${s.n}`,
-        description: s.text,
-        minutes: s.minutes,
-      })),
-      safetyNotes: payload.safetyNotes ? [payload.safetyNotes] : [],
-      tags: payload.tags,
-      source: "ai",
-      imagePrompt: payload.imagePrompt,
-    },
-  });
-  return toAiCraftRecord(row);
+  const craft: AiCraftRecord = {
+    id: `craft-ai-${Date.now().toString(36)}`,
+    slug: uniqueSlug,
+    title: payload.title,
+    description: payload.summary,
+    category: payload.category,
+    difficulty: payload.difficulty,
+    estimatedTimeMin: payload.estimatedTimeMin,
+    materials: payload.materials.map(({ name, qty, unit, optional }) => ({
+      name,
+      qty,
+      unit,
+      optional,
+    })),
+    tools: payload.tools,
+    steps: payload.steps.map((s) => ({
+      title: `Шаг ${s.n}`,
+      description: s.text,
+      minutes: s.minutes,
+    })),
+    safetyNotes: payload.safetyNotes ? [payload.safetyNotes] : [],
+    tags: payload.tags,
+    source: "ai",
+    imagePrompt: payload.imagePrompt,
+    createdAt: new Date().toISOString(),
+  };
+  aiCrafts.unshift(craft);
+  return craft;
 }
 
 export async function findAiCraft(id: string): Promise<AiCraftRecord | undefined> {
-  const row = await prisma.craft.findUnique({ where: { id } });
-  return row && row.source === "ai" ? toAiCraftRecord(row) : undefined;
+  return aiCrafts.find((c) => c.id === id);
 }
 
 export async function attachImageToCraft(
   craftId: string,
   image: { imageSeed: number; assetId: string; imageUrl: string }
 ): Promise<void> {
-  await prisma.craft.updateMany({
-    where: { id: craftId, source: "ai" },
-    data: {
-      imageSeed: image.imageSeed,
-      assetId: image.assetId,
-      imageUrl: image.imageUrl,
-    },
-  });
+  const craft = aiCrafts.find((c) => c.id === craftId);
+  if (craft) {
+    craft.imageSeed = image.imageSeed;
+    craft.assetId = image.assetId;
+    craft.imageUrl = image.imageUrl;
+  }
 }
-
-/* ===== Запасы ===== */
-
-export async function listInventory(): Promise<InventoryRecord[]> {
-  return prisma.inventoryItem.findMany({ orderBy: { name: "asc" } });
-}
-
-export async function upsertInventoryItem(
-  name: string,
-  stock: number,
-  unit: string
-): Promise<InventoryRecord> {
-  return prisma.inventoryItem.upsert({
-    where: { name },
-    create: { name, stock, unit },
-    update: { stock, unit },
-  });
-}
-
-export async function deleteInventoryItem(id: string): Promise<boolean> {
-  const result = await prisma.inventoryItem.deleteMany({ where: { id } });
-  return result.count > 0;
-}
-
-/* ===== Проекты ===== */
-
-export async function listProjects(): Promise<Project[]> {
-  const rows = await prisma.project.findMany({ orderBy: { startedAt: "desc" } });
-  return rows.map(toProject);
-}
-
-export async function findProject(id: string): Promise<Project | null> {
-  const row = await prisma.project.findUnique({ where: { id } });
-  return row ? toProject(row) : null;
-}
-
-export async function createProject(craft: Craft): Promise<Project> {
-  const row = await prisma.project.create({
-    data: {
-      craftSlug: craft.slug,
-      craftTitle: craft.title,
-      status: "в работе",
-      steps: craft.steps.map((_, i) => ({
-        index: i,
-        done: false,
-        minutesSpent: 0,
-      })),
-    },
-  });
-  return toProject(row);
-}
-
-/* Прежний код мутировал объект проекта напрямую — теперь сохраняйте
-   состояние явно: p.steps[i].done = true; await saveProject(p); */
-export async function saveProject(project: Project): Promise<void> {
-  await prisma.project.update({
-    where: { id: project.id },
-    data: {
-      status: project.status,
-      steps: project.steps as unknown as Prisma.InputJsonValue,
-      updatedAt: new Date(),
-    },
-  });
-}
-
-/* ===== Доски ===== */
-
-export async function listBoards(): Promise<Board[]> {
-  const rows = await prisma.board.findMany({ orderBy: { createdAt: "asc" } });
-  return rows.map(toBoard);
-}
-
-export async function createBoard(
-  title: string,
-  craftSlugs: string[]
-): Promise<Board> {
-  const row = await prisma.board.create({
-    data: { title, craftSlugs },
-  });
-  return toBoard(row);
-}
-
-export async function saveBoard(board: Board): Promise<void> {
-  await prisma.board.update({
-    where: { id: board.id },
-    data: { title: board.title, craftSlugs: board.craftSlugs },
-  });
-}
-
-export async function deleteBoard(id: string): Promise<boolean> {
-  const result = await prisma.board.deleteMany({ where: { id } });
-  return result.count > 0;
-}
-
-/* ===== Кэш картинок (API прежнего imageAssetStore сохранён) ===== */
 
 export const imageAssetStore = {
   async findByHash(promptHash: string): Promise<ImageAsset | null> {
-    const row = await prisma.imageAsset.findUnique({ where: { promptHash } });
-    return row ? toImageAsset(row) : null;
+    return memoryImageAssets.find((a) => a.promptHash === promptHash) ?? null;
   },
-
   async create(input: {
     promptHash: string;
     prompt: string;
     provider: string;
     seed: number;
   }): Promise<ImageAsset> {
-    const existing = await prisma.imageAsset.findUnique({
-      where: { promptHash: input.promptHash },
-    });
+    const existing = memoryImageAssets.find((a) => a.promptHash === input.promptHash);
     if (existing) {
       throw new P2002UniqueViolation("ImageAsset.promptHash");
     }
-    const row = await prisma.imageAsset.create({
-      data: {
-        promptHash: input.promptHash,
-        prompt: input.prompt,
-        provider: input.provider,
-        seed: input.seed,
-        steps: Number(process.env.CF_STEPS) || 4,
-      },
-    });
-    return toImageAsset(row);
+    const asset: ImageAsset = {
+      id: `img-${Date.now().toString(36)}`,
+      promptHash: input.promptHash,
+      prompt: input.prompt,
+      provider: input.provider,
+      fileUrl: null,
+      seed: input.seed,
+      width: 1024,
+      height: 1024,
+      steps: 4,
+      hits: 0,
+      createdAt: new Date().toISOString(),
+    };
+    memoryImageAssets.unshift(asset);
+    return asset;
   },
-
-  createUniqueViolation(): Error {
-    return new P2002UniqueViolation("ImageAsset.promptHash");
+  async attachFileUrl(id: string, fileUrl: string): Promise<void> {
+    const asset = memoryImageAssets.find((a) => a.id === id);
+    if (asset) asset.fileUrl = fileUrl;
   },
-
-  async incrementHits(id: string): Promise<void> {
-    await prisma.imageAsset.updateMany({
-      where: { id },
-      data: { hits: { increment: 1 } },
-    });
-  },
-
-  async updateFileUrl(id: string, fileUrl: string): Promise<void> {
-    await prisma.imageAsset.updateMany({ where: { id }, data: { fileUrl } });
-  },
-
-  async remove(id: string): Promise<void> {
-    await prisma.imageAsset.deleteMany({ where: { id } });
+  async bumpHits(id: string): Promise<void> {
+    const asset = memoryImageAssets.find((a) => a.id === id);
+    if (asset) asset.hits += 1;
   },
 };
 
-/* ===== Черновики ИИ ===== */
+export const memoryAiStats = {
+  llmCalls: 0,
+  imageRenders: 0,
+  cacheHits: 0,
+  cacheMisses: 0,
+};
 
-export async function createAiDraft(input: {
-  topic: string;
-  normalizedTopic: string;
-  payload: unknown;
-  valid: boolean;
-}): Promise<AiDraft> {
-  const row = await prisma.aiDraft.create({
-    data: {
-      topic: input.topic,
-      normalizedTopic: input.normalizedTopic,
-      payload: input.payload as Prisma.InputJsonValue,
-      valid: input.valid,
-    },
-  });
-  return toAiDraft(row);
+export async function bumpAiStat(key: keyof typeof memoryAiStats): Promise<number> {
+  memoryAiStats[key] += 1;
+  return memoryAiStats[key];
 }
 
-export async function findAiDraft(id: string): Promise<AiDraft | undefined> {
-  const row = await prisma.aiDraft.findUnique({ where: { id } });
-  return row ? toAiDraft(row) : undefined;
-}
-
-export async function findCachedAiDraft(
-  normalizedTopic: string,
-  withinMs: number
-): Promise<AiDraft | null> {
-  const row = await prisma.aiDraft.findFirst({
-    where: {
-      normalizedTopic,
-      valid: true,
-      createdAt: { gte: new Date(Date.now() - withinMs) },
-    },
-    orderBy: { createdAt: "desc" },
-  });
-  return row ? toAiDraft(row) : null;
-}
-
-
-export async function findCraftBySlug(slug: string): Promise<AiCraft | undefined> {
-  const row = await prisma.craft.findUnique({ where: { slug } });
-  return row ? toAiCraft(row) : undefined;
-}
-export async function markAiDraftApproved(
-  id: string,
-  craftId: string
-): Promise<void> {
-  await prisma.aiDraft.updateMany({
-    where: { id },
-    data: { status: "approved", craftId },
-  });
-}
-
-/* ===== Счётчики для /api/stats/ai (прежний объект aiStats) ===== */
-
-export type AiStatKey = "llmCalls" | "imageRenders" | "cacheHits" | "cacheMisses";
-
-export async function getAiStats(): Promise<Record<AiStatKey, number>> {
-  const stats: Record<AiStatKey, number> = {
-    llmCalls: 0,
-    imageRenders: 0,
-    cacheHits: 0,
-    cacheMisses: 0,
-  };
-  const rows = await prisma.aiStats.findMany();
-  for (const row of rows) {
-    if (row.key in stats) stats[row.key as AiStatKey] = row.value;
-  }
-  return stats;
-}
-
-export async function bumpAiStat(key: AiStatKey, by = 1): Promise<void> {
-  await prisma.aiStats.upsert({
-    where: { key },
-    create: { key, value: by },
-    update: { value: { increment: by } },
-  });
-}
-
-/* ===== Дневной лимит генераций (GEN_PER_USER_PER_DAY) ===== */
-
-export async function countGenerationsToday(userId: string): Promise<number> {
-  const day = new Date().toISOString().slice(0, 10);
-  const row = await prisma.generationCounter.findUnique({
-    where: { userId_day: { userId, day } },
-  });
-  return row?.count ?? 0;
-}
-
-export async function registerGeneration(userId: string): Promise<void> {
-  const day = new Date().toISOString().slice(0, 10);
-  await prisma.generationCounter.upsert({
-    where: { userId_day: { userId, day } },
-    create: { userId, day, count: 1 },
-    update: { count: { increment: 1 } },
-  });
+export async function getAiStats(): Promise<typeof memoryAiStats> {
+  return { ...memoryAiStats };
 }
