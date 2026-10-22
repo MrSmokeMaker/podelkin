@@ -2,8 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Clock, RefreshCw } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Clock, Crown, Dices, RefreshCw, Sparkles } from "lucide-react";
 import { CraftPhoto } from "@/components/craft-photo";
+import { useToast } from "@/components/toast";
+import { useFeatureFlags } from "@/hooks/use-feature-flags";
 import {
   categoryIcon,
   DIFFICULTY_STYLES,
@@ -100,10 +103,16 @@ function catalogToIdea(item: CatalogItem): TodayIdea {
 }
 
 export default function HomePage() {
+  const router = useRouter();
+  const showToast = useToast();
+  const { has } = useFeatureFlags();
+  const canRandomCraft = has("randomCraft");
+
   const ranked = useMemo(() => [...crafts].sort(byStockFit), []);
   const [catalog, setCatalog] = useState<CatalogItem[]>([]);
   const [offset, setOffset] = useState(0);
   const [spinning, setSpinning] = useState(false);
+  const [pickingRandom, setPickingRandom] = useState(false);
 
   /* Уже добавленные поделки (из источников) подтягиваются на клиенте,
      чтобы первый кадр совпадал с серверным рендером. */
@@ -141,10 +150,105 @@ export default function HomePage() {
     setOffset(next);
   };
 
+  /* Выбор случайной поделки строго с сайта «Своими Руками» (svoimirukamy.com).
+     Функция доступна только для пользователей с платными тарифами (Премиум и Директор). */
+  const handleRandomCraft = async () => {
+    if (!canRandomCraft) {
+      showToast(
+        "Функция доступна в тарифах Премиум и Директор",
+        "Оформите подписку, чтобы находить случайные поделки со «Своими Руками»"
+      );
+      router.push("/billing");
+      return;
+    }
+
+    try {
+      setPickingRandom(true);
+      const res = await fetch("/api/catalog/random");
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        if (res.status === 403) {
+          showToast(
+            "Нужен платный тариф",
+            data.error || "Переходим к выбору тарифа..."
+          );
+          router.push("/billing");
+          return;
+        }
+        throw new Error(data.error || "Не удалось загрузить поделку");
+      }
+
+      const data = await res.json();
+      if (data.item?.id) {
+        showToast("Случайная поделка найдена!", data.item.title);
+        router.push(`/podelki/${data.item.id}`);
+      }
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : "Попробуйте ещё раз чуть позже";
+      showToast("Ошибка поиска поделки", message);
+    } finally {
+      setPickingRandom(false);
+    }
+  };
+
   const TodayIcon = today.category ? categoryIcon(today.category) : null;
 
   return (
     <div className="space-y-4 sm:space-y-6">
+      {/* Блок «Случайная поделка» со svoimirukamy.com */}
+      <div className="relative overflow-hidden rounded-3xl border border-clay/15 bg-gradient-to-r from-clay/10 via-amber-500/10 to-clay/5 p-4 sm:p-5 shadow-card">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3.5">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-clay text-white shadow-md shadow-clay/25">
+              <Dices className="h-6 w-6" aria-hidden />
+            </div>
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-base font-bold text-ink">
+                  Случайная поделка
+                </span>
+                <span className="rounded-full bg-clay/15 px-2.5 py-0.5 text-xs font-semibold text-clay">
+                  Своими Руками
+                </span>
+                {!canRandomCraft && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-[#DDB771] to-[#C98DA4] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white shadow-xs">
+                    <Crown className="h-3 w-3" aria-hidden />
+                    PRO
+                  </span>
+                )}
+              </div>
+              <p className="mt-0.5 text-xs text-ink-soft sm:text-sm">
+                Случайный мастер-класс из каталога «Своими Руками» (svoimirukamy.com)
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleRandomCraft}
+            disabled={pickingRandom}
+            className={cn(
+              "inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl px-5 py-2.5 text-sm font-bold shadow-md transition active:scale-95 disabled:opacity-60",
+              canRandomCraft
+                ? "bg-clay text-white shadow-clay/25 hover:bg-[#8A4A2C]"
+                : "bg-ink text-paper hover:bg-ink-soft"
+            )}
+          >
+            {pickingRandom ? (
+              <>
+                <RefreshCw className="h-4 w-4 animate-spin" aria-hidden />
+                <span>Ищем поделку...</span>
+              </>
+            ) : (
+              <>
+                <Sparkles className="h-4 w-4 text-amber-300" aria-hidden />
+                <span>{canRandomCraft ? "Случайная поделка" : "Открыть (Премиум)"}</span>
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+
       <section aria-labelledby="today-heading">
         <div className="flex items-center justify-between gap-3">
           <h1

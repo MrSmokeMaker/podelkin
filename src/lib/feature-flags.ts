@@ -11,6 +11,7 @@ export type Feature =
   | "basicStats"
   | "saveProject"
   | "exportTxt"
+  | "randomCraft"
   | "advancedStats"
   | "exportCsv"
   | "extendedProjects"
@@ -29,6 +30,7 @@ export const ALL_FEATURES: Feature[] = [
   "basicStats",
   "saveProject",
   "exportTxt",
+  "randomCraft",
   "advancedStats",
   "exportCsv",
   "extendedProjects",
@@ -50,6 +52,7 @@ export const ROLE_FEATURES: Record<Role, Feature[]> = {
     "basicStats",
     "saveProject",
     "exportTxt",
+    "randomCraft",
     "advancedStats",
     "exportCsv",
     "extendedProjects",
