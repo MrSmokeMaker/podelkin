@@ -151,12 +151,12 @@ export default function HomePage() {
   };
 
   /* Выбор случайной поделки строго с сайта «Своими Руками» (svoimirukamy.com).
-     Функция доступна только для пользователей с платными тарифами (Премиум и Директор). */
+     Запрос идёт напрямую к сайту в реальном времени. Доступно в тарифах Премиум и Директор. */
   const handleRandomCraft = async () => {
     if (!canRandomCraft) {
       showToast(
         "Функция доступна в тарифах Премиум и Директор",
-        "Оформите подписку, чтобы находить случайные поделки со «Своими Руками»"
+        "Оформите подписку, чтобы находить случайные поделки напрямую со «Своими Руками»"
       );
       router.push("/billing");
       return;
@@ -180,7 +180,7 @@ export default function HomePage() {
 
       const data = await res.json();
       if (data.item?.id) {
-        showToast("Случайная поделка найдена!", data.item.title);
+        showToast("Поделка со «Своими Руками» найдена!", data.item.title);
         router.push(`/podelki/${data.item.id}`);
       }
     } catch (err: unknown) {
@@ -196,7 +196,7 @@ export default function HomePage() {
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      {/* Блок «Случайная поделка» со svoimirukamy.com */}
+      {/* Блок «Случайная поделка» напрямую со svoimirukamy.com */}
       <div className="relative overflow-hidden rounded-3xl border border-clay/15 bg-gradient-to-r from-clay/10 via-amber-500/10 to-clay/5 p-4 sm:p-5 shadow-card">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-start gap-3.5">
@@ -209,7 +209,7 @@ export default function HomePage() {
                   Случайная поделка
                 </span>
                 <span className="rounded-full bg-clay/15 px-2.5 py-0.5 text-xs font-semibold text-clay">
-                  Своими Руками
+                  Прямо со Своими Руками
                 </span>
                 {!canRandomCraft && (
                   <span className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-[#DDB771] to-[#C98DA4] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white shadow-xs">
@@ -219,7 +219,7 @@ export default function HomePage() {
                 )}
               </div>
               <p className="mt-0.5 text-xs text-ink-soft sm:text-sm">
-                Случайный мастер-класс из каталога «Своими Руками» (svoimirukamy.com)
+                Выбирается в реальном времени напрямую с сайта svoimirukamy.com
               </p>
             </div>
           </div>
@@ -237,7 +237,7 @@ export default function HomePage() {
             {pickingRandom ? (
               <>
                 <RefreshCw className="h-4 w-4 animate-spin" aria-hidden />
-                <span>Ищем поделку...</span>
+                <span>Ищем на сайте...</span>
               </>
             ) : (
               <>
