@@ -1,7 +1,4 @@
-/* Готовая замена src/lib/catalog-db.ts при переходе на PostgreSQL + Prisma.
-   Клиентобезопасная часть: константы, типы и sourceNameFromUrl.
-   Функции базы — в src/lib/catalog-db-server.ts (шаблон:
-   prisma/catalog-db-server.postgres.ts). */
+/* Клиентобезопасная часть каталога: категории, источники и типы */
 
 export const CATALOG_CATEGORIES = [
   "бумажная модель",
@@ -10,11 +7,18 @@ export const CATALOG_CATEGORIES = [
   "игрушка",
   "макет",
   "декор",
+  "своими руками",
+  "самоделка",
 ] as const;
 
 export type CatalogCategory = (typeof CATALOG_CATEGORIES)[number];
 
-export const CATALOG_SOURCES = ["Only Paper", "1001 Заготовка"] as const;
+export const CATALOG_SOURCES = [
+  "Only Paper",
+  "1001 Заготовка",
+  "Своими Руками",
+  "Сделай Сам",
+] as const;
 export type CatalogSource = (typeof CATALOG_SOURCES)[number];
 
 export const CATALOG_DIFFICULTIES = ["легко", "средне", "сложно"] as const;
@@ -42,5 +46,7 @@ export function sourceNameFromUrl(url: string): CatalogSource | null {
   const lower = url.toLowerCase();
   if (lower.includes("only-paper.ru")) return "Only Paper";
   if (lower.includes("1001zagotovka.ru")) return "1001 Заготовка";
+  if (lower.includes("svoimirukamy.com")) return "Своими Руками";
+  if (lower.includes("sdelaysam-svoimirukami.ru")) return "Сделай Сам";
   return null;
 }

@@ -4,7 +4,7 @@ import { decodeEntities } from "@/server/services/sourceFetcher";
 export const dynamic = "force-dynamic";
 
 const FETCH_TIMEOUT_MS = 8_000;
-const RESULTS_PER_SITE = 8;
+const RESULTS_PER_SITE = 6;
 
 const USER_AGENT =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
@@ -31,22 +31,27 @@ export async function GET(request: NextRequest) {
   const results: Suggestion[] = [];
   const failed: string[] = [];
 
-  const [zagotovkaRes, onlyPaperRes] = await Promise.allSettled([
+  const settled = await Promise.allSettled([
+    searchSvoimiRukamy(query),
+    searchSdelaysam(query),
     search1001Zagotovka(query),
     searchOnlyPaper(query),
   ]);
 
-  if (zagotovkaRes.status === "fulfilled") {
-    results.push(...zagotovkaRes.value);
-  } else {
-    failed.push("1001zagotovka.ru");
-  }
+  const siteNames = [
+    "svoimirukamy.com",
+    "sdelaysam-svoimirukami.ru",
+    "1001zagotovka.ru",
+    "only-paper.ru",
+  ];
 
-  if (onlyPaperRes.status === "fulfilled") {
-    results.push(...onlyPaperRes.value);
-  } else {
-    failed.push("only-paper.ru");
-  }
+  settled.forEach((outcome, idx) => {
+    if (outcome.status === "fulfilled") {
+      results.push(...outcome.value);
+    } else {
+      failed.push(siteNames[idx]);
+    }
+  });
 
   return NextResponse.json(
     { results, failed },
@@ -54,15 +59,75 @@ export async function GET(request: NextRequest) {
   );
 }
 
-/* 1001zagotovka.ru — OpenCart интернет-магазин заготовок.
-   URL поиска: /index.php?route=product/search&search=... */
+/* 1. Svoimirukamy.com — классические пошаговые поделки с фото и материалами */
+async function searchSvoimiRukamy(query: string): Promise<Suggestion[]> {
+  const url = `https://svoimirukamy.com/?s=${encodeURIComponent(query)}`;
+  const res = await fetch(url, {
+    headers: { "User-Agent": USER_AGENT, Accept: "text/html" },
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+  });
+  if (!res.ok) throw new Error("svoimirukamy failed");
+  const html = await res.text();
+
+  const out: Suggestion[] = [];
+  const seen = new Set<string>();
+
+  const regex = /<h2 class="entry-title"[^>]*>\s*<a\b[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi;
+  let match: RegExpExecArray | null;
+  while ((match = regex.exec(html)) !== null && out.length < RESULTS_PER_SITE) {
+    const itemUrl = match[1];
+    const rawTitle = decodeEntities(match[2].replace(/<[^>]+>/g, " ")).trim();
+    if (!itemUrl || rawTitle.length < 3 || seen.has(itemUrl)) continue;
+    seen.add(itemUrl);
+
+    out.push({
+      url: itemUrl,
+      title: rawTitle,
+      site: "svoimirukamy.com",
+      siteLabel: "Своими Руками",
+    });
+  }
+  return out;
+}
+
+/* 2. Sdelaysam-svoimirukami.ru — DIY, дерево, бумага, домашние самоделки */
+async function searchSdelaysam(query: string): Promise<Suggestion[]> {
+  const url = `https://sdelaysam-svoimirukami.ru/index.php?do=search&subaction=search&story=${encodeURIComponent(query)}`;
+  const res = await fetch(url, {
+    headers: { "User-Agent": USER_AGENT, Accept: "text/html" },
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+  });
+  if (!res.ok) throw new Error("sdelaysam failed");
+  const html = await res.text();
+
+  const out: Suggestion[] = [];
+  const seen = new Set<string>();
+
+  const regex = /<a class="sres-wrap[^"]*" href="([^"]+)">[\s\S]*?<h2>([\s\S]*?)<\/h2>/gi;
+  let match: RegExpExecArray | null;
+  while ((match = regex.exec(html)) !== null && out.length < RESULTS_PER_SITE) {
+    const itemUrl = match[1];
+    const rawTitle = decodeEntities(match[2].replace(/<[^>]+>/g, " ")).trim();
+    if (!itemUrl || rawTitle.length < 3 || seen.has(itemUrl)) continue;
+    seen.add(itemUrl);
+
+    out.push({
+      url: itemUrl,
+      title: rawTitle,
+      site: "sdelaysam-svoimirukami.ru",
+      siteLabel: "Сделай Сам",
+    });
+  }
+  return out;
+}
+
+/* 3. 1001zagotovka.ru — OpenCart заготовки */
 async function search1001Zagotovka(query: string): Promise<Suggestion[]> {
   const url = `https://1001zagotovka.ru/index.php?route=product/search&search=${encodeURIComponent(query)}`;
   const res = await fetch(url, {
     headers: { "User-Agent": USER_AGENT, Accept: "text/html" },
     signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   });
-
   if (!res.ok) throw new Error("1001zagotovka failed");
   const html = await res.text();
 
@@ -84,13 +149,10 @@ async function search1001Zagotovka(query: string): Promise<Suggestion[]> {
       siteLabel: "1001 Заготовка",
     });
   }
-
   return out;
 }
 
-/* only-paper.ru — uCoz каталог бумажных моделей.
-   URL поиска: https://only-paper.ru/search/?q=...&t=0
-   Результаты выводятся в блоках <div class="eTitle"><a href="...">...</a></div> */
+/* 4. only-paper.ru — uCoz бумажные модели */
 async function searchOnlyPaper(query: string): Promise<Suggestion[]> {
   const url = `https://only-paper.ru/search/?q=${encodeURIComponent(query)}&t=0`;
   const res = await fetch(url, {
@@ -101,7 +163,6 @@ async function searchOnlyPaper(query: string): Promise<Suggestion[]> {
     },
     signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
   });
-
   if (!res.ok) throw new Error("only-paper failed");
   const html = await res.text();
 
@@ -124,6 +185,5 @@ async function searchOnlyPaper(query: string): Promise<Suggestion[]> {
       siteLabel: "Only-Paper",
     });
   }
-
   return out;
 }

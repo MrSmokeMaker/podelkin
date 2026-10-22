@@ -22,7 +22,7 @@ import {
 export const dynamic = "force-dynamic";
 
 /* По спеке источники только эти два — ссылка обязана вести на один из них. */
-const ALLOWED_SOURCE_DOMAINS = ["only-paper.ru", "1001zagotovka.ru"];
+const ALLOWED_SOURCE_DOMAINS = ["only-paper.ru", "1001zagotovka.ru", "svoimirukamy.com", "sdelaysam-svoimirukami.ru"];
 
 const THUMB_EXT: Record<string, string> = {
   "image/jpeg": "jpg",
