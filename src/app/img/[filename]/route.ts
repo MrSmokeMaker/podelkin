@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import os from "node:os";
 
 export const dynamic = "force-dynamic";
 
@@ -12,24 +13,35 @@ export async function GET(
 ) {
   const { filename } = await params;
 
-  // Только имя файла внутри uploads/crafts — без путей и обхода каталогов.
   if (!FILENAME_PATTERN.test(filename) || filename.includes("..")) {
     return NextResponse.json({ error: "Некорректное имя файла" }, { status: 400 });
   }
 
+  // 1. Проверяем в /tmp/crafts (Vercel serverless)
+  const tmpPath = path.join(os.tmpdir(), "crafts", filename);
   try {
-    const data = await readFile(
-      path.join(process.cwd(), "uploads", "crafts", filename)
-    );
+    const data = await readFile(tmpPath);
     return new NextResponse(new Uint8Array(data), {
       status: 200,
       headers: {
         "Content-Type": "image/jpeg",
-        // Ассеты неизменяемы: строка ImageAsset владеет файлом навсегда.
         "Cache-Control": "public, max-age=31536000, immutable",
       },
     });
   } catch {
-    return NextResponse.json({ error: "Файл не найден" }, { status: 404 });
+    // 2. Проверяем в uploads/crafts (локально)
+    try {
+      const localPath = path.join(process.cwd(), "uploads", "crafts", filename);
+      const data = await readFile(localPath);
+      return new NextResponse(new Uint8Array(data), {
+        status: 200,
+        headers: {
+          "Content-Type": "image/jpeg",
+          "Cache-Control": "public, max-age=31536000, immutable",
+        },
+      });
+    } catch {
+      return NextResponse.json({ error: "Файл не найден" }, { status: 404 });
+    }
   }
 }

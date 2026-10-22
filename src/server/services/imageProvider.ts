@@ -11,7 +11,6 @@ export class ImageRateLimitError extends Error {
 }
 
 export interface ImageRenderResult {
-  /** Локальный путь файла: воркер возвращает base64, файл кладём в uploads. */
   url: string;
   provider: string;
 }
@@ -22,10 +21,8 @@ export type ImageProvider = (
   assetId?: string
 ) => Promise<ImageRenderResult>;
 
-// Провайдер один — наш воркер (cloudflare/worker.js → FLUX-1-schnell).
-// Прямые вызовы Cloudflare API и pollinations удалены: ключей в приложении больше нет.
 export function resolveProviderName(): string {
-  return "worker";
+  return "flux";
 }
 
 export function getImageProvider(): ImageProvider {
@@ -41,25 +38,36 @@ async function renderViaWorker(
   try {
     base64 = await workerImage(prompt, seed);
   } catch (error) {
-    // Дневная квота Workers AI не восстанавливается ретраем — час тишины.
     if (error instanceof AiGatewayError && error.status === 429) {
       throw new ImageRateLimitError(3600);
     }
     throw error;
   }
 
-  const url = await writeAssetFile(base64, assetId);
-  return { url, provider: "worker" };
+  const url = await saveImage(base64, assetId);
+  return { url, provider: "flux" };
 }
 
-async function writeAssetFile(base64: string, assetId?: string): Promise<string> {
-  const fs = await import("node:fs/promises");
-  const path = await import("node:path");
-
-  const dir = path.join(process.cwd(), "uploads", "crafts");
-  await fs.mkdir(dir, { recursive: true });
-
+async function saveImage(base64: string, assetId?: string): Promise<string> {
   const filename = `${assetId ?? `craft-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`}.jpg`;
-  await fs.writeFile(path.join(dir, filename), Buffer.from(base64, "base64"));
-  return `/img/${filename}`;
+  
+  // Попытка сохранить на диск (/tmp для Vercel или uploads/crafts локально)
+  try {
+    const fs = await import("node:fs/promises");
+    const path = await import("node:path");
+    const os = await import("node:os");
+
+    const isVercel = Boolean(process.env.VERCEL);
+    const dir = isVercel
+      ? path.join(os.tmpdir(), "crafts")
+      : path.join(process.cwd(), "uploads", "crafts");
+
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(path.join(dir, filename), Buffer.from(base64, "base64"));
+    return `/img/${filename}`;
+  } catch (err) {
+    console.warn("Could not save to filesystem, returning data URI fallback:", err);
+    // 100% надежный fallback для Serverless сред — Data URI JPEG
+    return `data:image/jpeg;base64,${base64}`;
+  }
 }

@@ -108,7 +108,8 @@ export interface AiCraftRecord {
 }
 
 export class P2002UniqueViolation extends Error {
-  constructor(field: string) {
+  code = "P2002";
+  constructor(field: string = "unique") {
     super(`Unique violation on ${field}`);
     this.name = "P2002UniqueViolation";
   }
@@ -444,13 +445,28 @@ export const imageAssetStore = {
     memoryImageAssets.unshift(asset);
     return asset;
   },
+  createUniqueViolation(): Error {
+    return new P2002UniqueViolation("ImageAsset.promptHash");
+  },
+  async updateFileUrl(id: string, fileUrl: string): Promise<void> {
+    const asset = memoryImageAssets.find((a) => a.id === id);
+    if (asset) asset.fileUrl = fileUrl;
+  },
   async attachFileUrl(id: string, fileUrl: string): Promise<void> {
     const asset = memoryImageAssets.find((a) => a.id === id);
     if (asset) asset.fileUrl = fileUrl;
   },
+  async incrementHits(id: string): Promise<void> {
+    const asset = memoryImageAssets.find((a) => a.id === id);
+    if (asset) asset.hits += 1;
+  },
   async bumpHits(id: string): Promise<void> {
     const asset = memoryImageAssets.find((a) => a.id === id);
     if (asset) asset.hits += 1;
+  },
+  async remove(id: string): Promise<void> {
+    const idx = memoryImageAssets.findIndex((a) => a.id === id);
+    if (idx !== -1) memoryImageAssets.splice(idx, 1);
   },
 };
 
