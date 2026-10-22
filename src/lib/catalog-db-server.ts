@@ -4,6 +4,7 @@ import {
   type CatalogItem,
   sourceNameFromUrl,
 } from "./catalog-db";
+import extendedItems from "@/data/extended-catalog.json";
 
 const initialCatalogItems: CatalogItem[] = [
   {
@@ -100,6 +101,7 @@ const initialCatalogItems: CatalogItem[] = [
     tags: ["механика", "моторчик", "дача", "набор"],
     createdAt: "2025-11-20T10:45:00.000Z",
   },
+  ...(extendedItems as unknown as CatalogItem[]),
 ];
 
 const memoryCatalog: CatalogItem[] = [...initialCatalogItems];
@@ -115,6 +117,8 @@ export async function findCatalogItemBySourceUrl(sourceUrl: string): Promise<Cat
 export async function findCatalogItemById(id: string): Promise<CatalogItem | null> {
   return memoryCatalog.find((i) => i.id === id) ?? null;
 }
+
+export const findCatalogItem = findCatalogItemById;
 
 export async function createCatalogItem(input: {
   title: string;
@@ -148,5 +152,3 @@ export async function createCatalogItem(input: {
   memoryCatalog.unshift(item);
   return item;
 }
-
-export const findCatalogItem = findCatalogItemById;
